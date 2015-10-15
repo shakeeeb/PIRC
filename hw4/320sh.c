@@ -9,7 +9,7 @@ int
 main (int argc, char ** argv, char **envp) {
 
   int finished = 0;
-  char *prompt = "im failing> ";
+  char *prompt = "320sh> ";
   char cmd[MAX_INPUT];
 
 
