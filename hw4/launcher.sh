@@ -1,6 +1,6 @@
 #!/bin/sh
 
-## Swish launcher 
+## Swish launcher
 #
 #  This shell script ensures that the swish shell
 #  gets control key strokes through standard in.
