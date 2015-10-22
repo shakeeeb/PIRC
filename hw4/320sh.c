@@ -13,7 +13,9 @@ char** parse_args(char* command, char* delimiter); // splits a command into a to
 char* find_filepath(char** path, char* command); // finds a legitimate path
 void unix_error(char *msg); // textbook unix error
 void mass_print(char** tokens); // will eventually print a character array
-int begin_execute(char** args);
+int begin_execute(char** args); // begins execution
+void cd(char** args);// change directory. uhhh, sorta half done
+void pwd(void); // print working directory
 
 // Assume no input line will be longer than 1024 bytes
 #define MAX_INPUT 1025 // the full line + a null termination
@@ -32,7 +34,7 @@ int main (int argc, char ** argv, char **envp) {
   int finished = 0;
   char *prompt = "320sh> ";
   char *whitespace = " \n\r\t"; // for delimiting
-  char cmd[MAX_INPUT]; // the buffer, for the string
+  char cmd[MAX_INPUT] = ""; // the buffer, for the string
   // this is all path stuff
   // this just gets the PATH variable and all the possible paths
   char** path; // this holds all the paths
@@ -58,13 +60,13 @@ int main (int argc, char ** argv, char **envp) {
       finished = 1;
       break;
     }
-    // we can replace all this with gnu readline 
+    // we can replace all this with gnu readline
     // the main reason for readline is to have the history, already done for us. which is glorious
 
     // Execute the command, handling built-in commands separately
 
     // Just echo the command line for now
-    write(1, cmd, strnlen(cmd, MAX_INPUT)); // tells us that it recieved our input correctly
+    //write(1, cmd, strnlen(cmd, MAX_INPUT)); // tells us that it recieved our input correctly
     // parse through cursor to make see if it's 'exit ' for the sake of exiting
     // read the input
     for(rv = 1, count = 0, cursor = cmd, last_char = 1; // all of the variables
@@ -78,9 +80,10 @@ int main (int argc, char ** argv, char **envp) {
     args = parse_args((char*)cmd, whitespace); // parse the command from the line
 
     // see if it's 'exit ' for the sake of exiting
-    if(strncmp(cmd, "exit ", 5) == 0){ // TODO: need to fix so it will accept anything AFTER "exit " as well
+    if(strncmp(cmd, "exit", 4) == 0){ // TODO: need to fix so it will accept anything AFTER "exit " as well
         Exit(); // itll just exit
     }
+    // actually this is just there for now. after we get builtins fully up and running we can completely remove this
     // this is just a tester command
     if(strncmp(cmd, "print", 3) == 0){
       mass_print(path);
@@ -232,10 +235,39 @@ int begin_execute(char** args){ // args just contains the list of arguments
   // using the return from find_filepath, fork and exec.
     char *holder = args[0]; // also check size of builtins
     int i;
+    int execution_done = 0; // this checks if iv'e finished executing stuff. at certain points, i may need to return
+    // based on what i've executed
     for(i = 0; i < sizeof(builtins)/sizeof(char*); i++){
       if (strcmp(holder, builtins[i]) == 0){
         // we found a builtin
-        printf("found a builtin: %s", builtins[i]);
+        //printf("searching for builtins...\n");
+        switch(i){ // i switch on the index of the builtin because it's easier
+          case 0: // cd
+            printf("found a builtin: %s\n", builtins[i]);
+            cd(args);
+            execution_done = 1; // finished executing a command
+            break;
+          case 1: // pwd
+            printf("found a builtin: %s\n", builtins[i]);
+            pwd();
+            execution_done = 1; // finished executing a command
+            break;
+          case 2: // echo
+            break;
+          case 3: // set
+            break;
+          case 4: //exit
+            printf("found a builtin: %s\n", builtins[i]);
+            Exit();
+            break;
+          default: // how the fuck did you get here then?
+            break;
+
+        }
+
+      }// end of if
+      if(execution_done == 1){
+        return 0; // if it reaches this point, it has executed a builtin function cleanly
       }
     }
     // if it reaches this point without finding a builtin, then its an executable
@@ -267,6 +299,7 @@ int begin_execute(char** args){ // args just contains the list of arguments
       if(filepath == NULL){
         //uh oh
         printf("uh oh\n");
+        unix_error("filepath not found");
       } else {
         // yay
         printf("filepath: %s\n", filepath);
@@ -276,6 +309,76 @@ int begin_execute(char** args){ // args just contains the list of arguments
     return 1;
 
     //OOOOOOHHH WE GOTTA THINK ABOUT /<exec> AND ./<exec>
+
+}
+
+void pwd(void){ // print working directory
+  char * result = malloc(MAX_INPUT);
+  getcwd(result, MAX_INPUT); // getcwd gets the current working directory
+  printf("%s\n", result); // and prints the output to the screen
+  // do i free that shit?
+  //free(result);
+  // also idk what to do in the case of an error here,
+  // or even how i would get an error here
+  return;
+}
+
+void cd(char** args){ // change directory
+  //gotta work in the whole ./../../.. thing
+  // to cd down, you just add the directory to the current working directory
+  // check if its got a slash in front of it, to know whether to cd down or up
+  // check if it's . or ..
+  // for a repeated series of ./../../../..
+  //loop over the string, finding and locating ..'s
+  // and then, remove a directory from the cwd for each .. you find.
+  // if its a . dont worry about it
+  // if its just cd with no arguments, then just go to home
+  char * result = malloc(MAX_INPUT); // dont forget to free this shitat some point
+  char * directory = args[1]; // a cd usually only has 1 argument, a directory location
+  if(directory == NULL){ // if it's just cd, go home
+    strcpy(result, getenv("HOME")); // instead of setting shit equal, better to use strcpy to get deep copies
+    if(chdir(result) != 0){
+      unix_error("change directory error");
+    }
+    //free(result);
+    return; // now i return with no worries
+  }else if(strcmp(directory, "..") == 0){
+    getcwd(result, MAX_INPUT); // copy over the current workign directory
+    strcat(result, "/"); // i need to put a slash
+    strcat(result, ".."); // strcat autoappends a null, but there needs to be space for it doe
+    if(chdir(result) != 0){
+      unix_error("change directory error");
+    }
+    //free(result);
+    return; // return with no worries
+  }else if(strcmp(directory, ".") == 0){
+    // you literally dont need to do shit, but whatever
+    getcwd(result, MAX_INPUT);
+    strcat(result, "/");
+    strcat(result, ".");
+    if(chdir(result) != 0){
+      unix_error("change directory error");
+    }
+    //free(result);
+    return; // return with no worries
+  } else { // its just a subdirectory
+    getcwd(result, MAX_INPUT);
+    strcat(result, "/");
+    strcat(result, directory);
+    if(chdir(result) != 0){
+      unix_error("change directory error");
+    }
+    return;
+  }
+  // gotta take care of dash too
+  // doesnt take care of the case with repeated ../../../../
+  // i know how to do that but
+  // im not sure if they would give us something wierd like  ../blehdeirectory/../../bluhh or something
+  // and i'm not sure how to handle the errors given that case
+  //if it reaches here, something went wrong
+  unix_error("cd error");
+  //free(result);
+  return;
 
 }
 /*
