@@ -6,6 +6,15 @@
 #include <sys/stat.h>
 // fuck it. i'm not gonna use readline.
 
+// function declarations
+static void Exit(void);
+//static pid_t Fork(void);
+char** parse_args(char* command, char* delimiter); // splits a command into a token array
+char* find_filepath(char** path, char* command); // finds a legitimate path
+void unix_error(char *msg); // textbook unix error
+void mass_print(char** tokens); // will eventually print a character array
+int begin_execute(char** args);
+
 // Assume no input line will be longer than 1024 bytes
 #define MAX_INPUT 1025 // the full line + a null termination
 
@@ -17,17 +26,8 @@ const char* builtins[] = {
   "exit\0"
 }; // these are all of our builtins
 
-// function declarations
-static void Exit(void);
-//static pid_t Fork(void);
-char** parse_args(char* command, char* delimiter); // splits a command into a token array
-char* find_filepath(char** path, char* command); // finds a legitimate path
-void unix_error(char *msg); // textbook unix error
-void mass_print(char** tokens); // will eventually print a character array
-int begin_execute(char** args);
-
 int main (int argc, char ** argv, char **envp) {
-  // envp contains the environment variables? the PATH varaible
+  // envp contains the environment variables? the PATH variable
   //PATH will be used to check wher binaries are stored
   int finished = 0;
   char *prompt = "320sh> ";
@@ -36,12 +36,12 @@ int main (int argc, char ** argv, char **envp) {
   // this is all path stuff
   // this just gets the PATH variable and all the possible paths
   char** path; // this holds all the paths
-  char* pathholder;
+  char* pathholder; // particular path in path array
   char* pathdelimiter = ":";
   pathholder = malloc(strlen(getenv("PATH")) * sizeof(char) + 1);
-  strcpy(pathholder, getenv("PATH")); // GETENV IS NOT REENTRANT
-  path = parse_args(pathholder, pathdelimiter);
-  path = path;
+  strcpy(pathholder, getenv("PATH")); // GETENV IS NOT REENTRANT (same copy in memory can be used by mult users)
+  path = parse_args(pathholder, pathdelimiter); // pass particular ath and delimeter
+  path = path; // ?? redudant shakeeb?
 
 
   while (!finished) { // while finish == 0
@@ -50,7 +50,7 @@ int main (int argc, char ** argv, char **envp) {
     int rv; // check writes
     int count;
     char **args; // holds arguments parsed from command
-    args = args;
+    args = args; // ... why?????? ... oh wait this is cuz that unused variable crap isn't it? okay. Got it.
 
     // Print the prompt and check if it is successful
     rv = write(1, prompt, strlen(prompt));
@@ -78,18 +78,16 @@ int main (int argc, char ** argv, char **envp) {
     args = parse_args((char*)cmd, whitespace); // parse the command from the line
 
     // see if it's 'exit ' for the sake of exiting
-    if(strncmp(cmd, "exit ", 5) == 0){ // if it's stright up exit, note the extra space
+    if(strncmp(cmd, "exit ", 5) == 0){ // TODO: need to fix so it will accept anything AFTER "exit " as well
         Exit(); // itll just exit
     }
     // this is just a tester command
     if(strncmp(cmd, "print", 3) == 0){
       mass_print(path);
     }
-    args = parse_args((char*)cmd, whitespace); //parse the commands from the line
     // ive got to search for certain commands for builtins and shit
     //cd, cd ., cd .. cd ../../ pwd (builtins)-- ls la mkdir (not builtins but try to incorporate them at a certain point)
     begin_execute(args); // send in args to be executed
-
   }
 
   return 0;
@@ -109,7 +107,8 @@ char* find_filepath(char** path, char* command){ // the command is something lik
   int index = 0; // the index
   char* currentPath = path[index]; // current path
   while(currentPath != NULL){
-    result = malloc(strlen(path[index])+strlen(command)+2);// extra 2 for the / and the /0 remember to free this
+    result = malloc(strlen(path[index])+strlen(command)+2);// extra 2 for the / and the /0 remember to free this --> TODO: use slides to keep track of when child finishes,
+                                                                // after child finishes then free all memory and continue in the loop.
     strcpy(result , path[index]); // copies the current path into result
     result = strcat(result, "/"); // add the slash
     result = strcat(result, command); // add the command itself, automatically adds in a /0
@@ -124,11 +123,11 @@ char* find_filepath(char** path, char* command){ // the command is something lik
     index++;// and then we increment the index
     currentPath = path[index]; // go to the next index
     free(result); // dont forget
-    free(tester); // to free malloced shit
+    free(tester); // to free malloced
   }
   if(result == NULL){
     // we didnt find anything in the paths
-    // print some message shit
+    // print some message
     printf("did not find the filepath \n");
     return NULL;
   } else {
@@ -144,7 +143,7 @@ char* find_filepath(char** path, char* command){ // the command is something lik
 *parses through the string and generates an array of tokens
 *it then returns this array of tokens
 */
-char** parse_args(char *command, char* delimiter){
+char** parse_args(char *command, char* delimiter){ // okay so as I understand it this is just taking all the arguements off the shell and putting it into an array?
   int size = sizeof(command)*2; // if every sharacter is a token
   char** result = malloc(size * sizeof(char*)); // malloc space for a big ass buffer
   int spot = 0; // we start at the first spot
