@@ -143,7 +143,7 @@ char* find_filepath(char** path, char* command){ // the command is something lik
   int index = 0; // the index
   char* currentPath = path[index]; // current path
   while(currentPath != NULL){
-    result = malloc(strlen(path[index])+strlen(command)+2);// extra 2 for the / and the /0 remember to free this 
+    result = malloc(strlen(path[index])+strlen(command)+2);// extra 2 for the / and the /0 remember to free this
               //--> TODO: use slides to keep track of when child finishes,
               // after child finishes then free all memory and continue in the loop.
     strcpy(result , path[index]); // copies the current path into result
@@ -427,9 +427,19 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
     }
     //free(result);
     return; // return with no worries
-  }
-  // this is going to check for the loop case
-  else if((strncmp(directory, dotslash, 2) == 0) || (strncmp(directory, dotdotslash, 3) == 0)){
+  } else if(strcmp(directory, "-") == 0){ // dash
+    // use the getenv oldpwd
+    strcpy(result, getenv("OLDPWD"));
+    // now i have to set OLDPWD to be getCWD
+    char * currentDirHolder = malloc(MAX_INPUT);
+    setenv( "OLDPWD", getcwd(currentDirHolder, MAX_INPUT), 1); // overwrite needs to be nonzero to overwrite existing enviernment variables
+    // setenv makes copies so i need to free currentDirHolder
+    free(currentDirHolder);
+    if(chdir(result) != 0){
+      unix_error(args[1]);
+    }
+    return;
+  } else if((strncmp(directory, dotslash, 2) == 0) || (strncmp(directory, dotdotslash, 3) == 0)){
     // count the number of ../
     char * cursor = directory;
     int count = 0;
@@ -442,7 +452,7 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
         count++;
       } else {
         // else, its invalid, thats what else
-        unix_error("invalid directory");
+        unix_error(args[1]);
         return;
       }
     }
@@ -464,11 +474,6 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
     }
     return;
   }
-  // gotta take care of dash too
-  // doesnt take care of the case with repeated ../../../../
-  // i know how to do that but
-  // im not sure if they would give us something wierd like  ../blehdeirectory/../../bluhh or something
-  // and i'm not sure how to handle the errors given that case
   //if it reaches here, something went wrong
   unix_error("cd error");
   //free(result);
@@ -483,6 +488,3 @@ set detach-on-fork off
 and then in the debugger info inferiors
 */
 /* slide 50*** important for forking */
-
-
-
