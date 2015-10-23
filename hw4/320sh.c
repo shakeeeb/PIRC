@@ -7,6 +7,12 @@
 #include <sys/wait.h>
 // fuck it. i'm not gonna use readline.
 
+#ifdef debug
+  #define debug(fmt, ...) printf("DEBUG: %s:%s:%d ", fmt, __FILE__, __FUNCTION__, __LINE__, ##__VA_ARGS__)
+#else
+  #define debug(fmt, ...)
+#endif
+
 // function declarations
 static void Exit(void);
 static pid_t Fork(void);
@@ -121,7 +127,7 @@ char* find_filepath(char** path, char* command){ // the command is something lik
     struct stat *tester = malloc(sizeof(struct stat)); // the stat object
     if(stat(result, tester)== 0){ // if it exists, it'll be zero
       //in this case, we break and return the result
-      printf("found filepath! filepath is: %s\n", result);
+      debug("found filepath! filepath is: %s\n", result);
       free(tester); // dont forget to free this
       break;
     }
@@ -134,11 +140,11 @@ char* find_filepath(char** path, char* command){ // the command is something lik
   if(result == NULL){
     // we didnt find anything in the paths
     // print some message
-    printf("did not find the filepath \n");
+    debug("did not find the filepath \n");
     return NULL;
   } else {
     // we found something!
-    printf("returning filepath \n");
+    debug("returning filepath \n");
     return result;
   }
 
@@ -160,7 +166,7 @@ char** parse_args(char *command, char* delimiter){ // okay so as I understand it
   }
   token = strtok(command, delimiter); // grab the first token
   while (token != NULL){
-    printf("result: %s spot: %d\n", token, spot);
+    debug("result: %s spot: %d\n", token, spot);
     token = strcat(token, "\0"); // just append a zero to token
     result[spot] = token; //
     spot++; // increment the spot
@@ -217,7 +223,7 @@ void mass_print(char** tokens){ // i made this because for whatever reason, prin
 // assuming tokens is a null terminated array
   int index = 0;
   int last = sizeof(tokens);
-  //printf("last: %d\n",last);
+  //debug("last: %d\n",last);
   while(index < last){
     write(1, tokens[index], strlen(tokens[index]));
     write(1, "\n", 1);
@@ -242,15 +248,15 @@ int begin_execute(char** args){ // args just contains the list of arguments
     for(i = 0; i < sizeof(builtins)/sizeof(char*); i++){
       if (strcmp(cmd_holder, builtins[i]) == 0){
         // we found a builtin
-        //printf("searching for builtins...\n");
+        //debug("searching for builtins...\n");
         switch(i){ // i switch on the index of the builtin because it's easier
           case 0: // cd
-            printf("found a builtin: %s\n", builtins[i]);
+            debug("found a builtin: %s\n", builtins[i]);
             cd(args);
             execution_done = 1; // finished executing a command
             break;
           case 1: // pwd
-            printf("found a builtin: %s\n", builtins[i]);
+            debug("found a builtin: %s\n", builtins[i]);
             pwd();
             execution_done = 1; // finished executing a command
             break;
@@ -259,7 +265,7 @@ int begin_execute(char** args){ // args just contains the list of arguments
           case 3: // set
             break;
           case 4: //exit
-            printf("found a builtin: %s\n", builtins[i]);
+            debug("found a builtin: %s\n", builtins[i]);
             Exit();
             break;
           default: // how the fuck did you get here then?
@@ -279,11 +285,11 @@ int begin_execute(char** args){ // args just contains the list of arguments
     b = *(cmd_holder+1); // the second character
     if(a == '/'){
       // if a is slash
-      printf("i have recognized a slash character!\n");
+      debug("i have recognized a slash character!\n");
       // i can send it straight to execvp with no worries
     } else if ((a == '.') && (b == '/')) {
       // if its ./ something
-      printf("i have recognized a dot slash character!\n");
+      debug("i have recognized a dot slash character!\n");
       // i dont know
     } else {
       // it doesnt have the slash or dot slash
@@ -300,11 +306,10 @@ int begin_execute(char** args){ // args just contains the list of arguments
       // its not NULL, and i found the path
       if(filepath == NULL){
         //uh oh
-        printf("uh oh\n");
         unix_error("filepath not found");
       } else {
         // yay
-        printf("filepath: %s\n", filepath);
+        debug("filepath: %s\n", filepath);
       }
 
     }
@@ -335,7 +340,7 @@ int Execute(char **argv) {
 void pwd(void){ // print working directory
   char * result = malloc(MAX_INPUT);
   getcwd(result, MAX_INPUT); // getcwd gets the current working directory
-  printf("%s\n", result); // and prints the output to the screen
+  debug("%s\n", result); // and prints the output to the screen
   // do i free that shit?
   //free(result);
   // also idk what to do in the case of an error here,
