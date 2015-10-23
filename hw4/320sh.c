@@ -143,7 +143,8 @@ char* find_filepath(char** path, char* command){ // the command is something lik
   int index = 0; // the index
   char* currentPath = path[index]; // current path
   while(currentPath != NULL){
-    result = malloc(strlen(path[index])+strlen(command)+2);// extra 2 for the / and the /0 remember to free this --> TODO: use slides to keep track of when child finishes,
+    result = malloc(strlen(path[index])+strlen(command)+2);// extra 2 for the / and the /0 remember to free this 
+                                                                //--> TODO: use slides to keep track of when child finishes,
                                                                 // after child finishes then free all memory and continue in the loop.
     strcpy(result , path[index]); // copies the current path into result
     result = strcat(result, "/"); // add the slash
@@ -179,7 +180,7 @@ char* find_filepath(char** path, char* command){ // the command is something lik
 *parses through the string and generates an array of tokens
 *it then returns this array of tokens
 */
-char** parse_args(char *command, char* delimiter){ // okay so as I understand it this is just taking all the arguements off the shell and putting it into an array?
+char** parse_args(char *command, char* delimiter){
   int size = sizeof(command)*2; // if every sharacter is a token
   char** result = malloc(size * sizeof(char*)); // malloc space for a big ass buffer
   int spot = 0; // we start at the first spot
@@ -352,7 +353,8 @@ int begin_execute(char** args){ // args just contains the list of arguments
 
 }
 
-int Execute(char **args) {
+int Execute(char **args) { // --> TODO: NEED TO USE STAT FUNCTION TO CHECK FOR BINARY FIRST
+                                          // THEN IF NO BINARY PRINT "command not found" error
   pid_t cpid; // saves the pid of the child
   int waiting; // saves the integer to see if the parents should continue waiting
 
@@ -372,7 +374,7 @@ int Execute(char **args) {
 void pwd(void){ // print working directory
   char *result = malloc(MAX_INPUT);
   getcwd(result, MAX_INPUT); // getcwd gets the current working directory
-  debug("%s\n", result); // and prints the output to the screen
+  printf("%s\n", result); // and prints the output to the screen
   // do i free that shit?
   //free(result);
   // also idk what to do in the case of an error here,
@@ -380,7 +382,7 @@ void pwd(void){ // print working directory
   return;
 }
 
-void cd(char** args){ // change directory
+void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE "cd -" COMMAND!!!!!!
   //gotta work in the whole ./../../.. thing
   // to cd down, you just add the directory to the current working directory
   // check if its got a slash in front of it, to know whether to cd down or up
@@ -421,7 +423,8 @@ void cd(char** args){ // change directory
     //free(result);
     return; // return with no worries
   }
-  else if((strncmp(directory, dotslash, 2) == 0) || (strncmp(directory, dotdotslash, 3) == 0)){ // this is going to check for the loop case
+  // this is going to check for the loop case
+  else if((strncmp(directory, dotslash, 2) == 0) || (strncmp(directory, dotdotslash, 3) == 0)){
     // count the number of ../
     char * cursor = directory;
     int count = 0;
