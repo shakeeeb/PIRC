@@ -1,3 +1,5 @@
+// Devon & Shakeeb
+// aka: YoureFailingTryHarder
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -52,8 +54,7 @@ int main (int argc, char ** argv, char **envp) {
   char* pathdelimiter = ":";
   pathholder = malloc(strlen(getenv("PATH")) * sizeof(char) + 1);
   strcpy(pathholder, getenv("PATH")); // GETENV IS NOT REENTRANT (same copy in memory can be used by mult users)
-  path = parse_args(pathholder, pathdelimiter); // pass particular ath and delimeter
-  path = path; // ?? redudant shakeeb?
+  path = parse_args(pathholder, pathdelimiter); // pass particular path and delimeter
 
 
   while (!finished) { // while finish == 0
@@ -65,8 +66,7 @@ int main (int argc, char ** argv, char **envp) {
     char last_char;
     int rv; // check writes
     int count;
-    char **args; // holds arguments parsed from command
-    args = args; // ... why?????? ... oh wait this is cuz that unused variable crap isn't it? okay. Got it.
+    char **args; // holds arguments parsed from commands
 
     // gets current path and places it into the string to print to stdout
     strcpy(fprompt, "[");
@@ -144,8 +144,8 @@ char* find_filepath(char** path, char* command){ // the command is something lik
   char* currentPath = path[index]; // current path
   while(currentPath != NULL){
     result = malloc(strlen(path[index])+strlen(command)+2);// extra 2 for the / and the /0 remember to free this 
-                                                                //--> TODO: use slides to keep track of when child finishes,
-                                                                // after child finishes then free all memory and continue in the loop.
+              //--> TODO: use slides to keep track of when child finishes,
+              // after child finishes then free all memory and continue in the loop.
     strcpy(result , path[index]); // copies the current path into result
     result = strcat(result, "/"); // add the slash
     result = strcat(result, command); // add the command itself, automatically adds in a /0
@@ -285,8 +285,10 @@ int begin_execute(char** args){ // args just contains the list of arguments
             execution_done = 1; // finished executing a command
             break;
           case 2: // echo
+            //echo();
             break;
           case 3: // set
+            //set();
             break;
           case 4: //exit
             debug("found a builtin: %s\n", builtins[i]);
@@ -304,6 +306,13 @@ int begin_execute(char** args){ // args just contains the list of arguments
     }
 
     if (execution_done != 1) { // if it's not a builtin, assume executable
+      // TODO: NEED TO CHECK THE FILEPATH USING PATH STAT BEFORE PASSING TO EXECUTE
+      /*struct stat binCheck; // check to see if the binary exists before calling exec (exec is expensive, as Paul reminds us)
+      if (stat(args[0], &binCheck) < 0) {
+        unix_error(args[0]);
+        return 1;
+      }*/
+
       Execute(args);
       return 0;
     }
@@ -347,10 +356,6 @@ int begin_execute(char** args){ // args just contains the list of arguments
 
     // SHAKEEB : ) I HAVE NO IDEA WHAT THIS CODE IS FOR ^ I commented it out though and everything still worked so plz explain
     return 1;
-
-    //Execute(char **args);
-    //OOOOOOHHH WE GOTTA THINK ABOUT /<exec> AND ./<exec>
-
 }
 
 int Execute(char **args) { // --> TODO: NEED TO USE STAT FUNCTION TO CHECK FOR BINARY FIRST
@@ -375,8 +380,8 @@ void pwd(void){ // print working directory
   char *result = malloc(MAX_INPUT);
   getcwd(result, MAX_INPUT); // getcwd gets the current working directory
   printf("%s\n", result); // and prints the output to the screen
-  // do i free that shit?
-  //free(result);
+  // do i free that shit? --> yes shakeeb, freeing is good and it won't segfault :P
+  free(result);
   // also idk what to do in the case of an error here,
   // or even how i would get an error here
   return;
