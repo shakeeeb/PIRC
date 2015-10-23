@@ -4,16 +4,18 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 // fuck it. i'm not gonna use readline.
 
 // function declarations
 static void Exit(void);
-//static pid_t Fork(void);
+static pid_t Fork(void);
 char** parse_args(char* command, char* delimiter); // splits a command into a token array
 char* find_filepath(char** path, char* command); // finds a legitimate path
 void unix_error(char *msg); // textbook unix error
 void mass_print(char** tokens); // will eventually print a character array
 int begin_execute(char** args); // begins execution
+int Execute(char **argv); // executes the binary -- or tries to
 void cd(char** args);// change directory. uhhh, sorta half done
 void pwd(void); // print working directory
 
@@ -90,6 +92,7 @@ int main (int argc, char ** argv, char **envp) {
     }
     // ive got to search for certain commands for builtins and shit
     //cd, cd ., cd .. cd ../../ pwd (builtins)-- ls la mkdir (not builtins but try to incorporate them at a certain point)
+    Execute(args);
     begin_execute(args); // send in args to be executed
   }
 
@@ -189,7 +192,6 @@ static void Exit(void){
 *its just a wrapper that checks for any problems in fork
 *its commented out becuse i havent used it yet
 */
-/*
 static pid_t Fork(void){
   pid_t pid;
 
@@ -198,7 +200,7 @@ static pid_t Fork(void){
   }
   return pid;
 }
-*/
+
 /**
 * unix style error from the textbook
 */
@@ -233,12 +235,12 @@ int begin_execute(char** args){ // args just contains the list of arguments
   // get the PATH and parse it, just like you would parse arguments
   // after parsing launch find_filepath
   // using the return from find_filepath, fork and exec.
-    char *holder = args[0]; // also check size of builtins
+    char *cmd_holder = args[0]; // also check size of builtins
     int i;
     int execution_done = 0; // this checks if iv'e finished executing stuff. at certain points, i may need to return
     // based on what i've executed
     for(i = 0; i < sizeof(builtins)/sizeof(char*); i++){
-      if (strcmp(holder, builtins[i]) == 0){
+      if (strcmp(cmd_holder, builtins[i]) == 0){
         // we found a builtin
         //printf("searching for builtins...\n");
         switch(i){ // i switch on the index of the builtin because it's easier
@@ -273,8 +275,8 @@ int begin_execute(char** args){ // args just contains the list of arguments
     // if it reaches this point without finding a builtin, then its an executable
     // check if it has a slash (/), or a dot slash (./), cuz then we dont need to pass it through the filepath checking
     char a, b;
-    a = *holder; // the first character
-    b = *(holder+1); // the second character
+    a = *cmd_holder; // the first character
+    b = *(cmd_holder+1); // the second character
     if(a == '/'){
       // if a is slash
       printf("i have recognized a slash character!\n");
@@ -293,7 +295,7 @@ int begin_execute(char** args){ // args just contains the list of arguments
       path = parse_args(unparsedpath, ":");
       //free(unparsedpath); // i free this, cuz i don't need it anymore
       // and this will get the path
-      char* filepath = find_filepath(path ,holder); // i dont malloc stuff here, i malloced in find filepath
+      char* filepath = find_filepath(path ,cmd_holder); // i dont malloc stuff here, i malloced in find filepath
       //either this filepath is NULL, meaning the path wasn't able to be found, OR
       // its not NULL, and i found the path
       if(filepath == NULL){
@@ -308,8 +310,26 @@ int begin_execute(char** args){ // args just contains the list of arguments
     }
     return 1;
 
+    //Execute(char **args);
     //OOOOOOHHH WE GOTTA THINK ABOUT /<exec> AND ./<exec>
 
+}
+
+int Execute(char **argv) {
+  pid_t cpid; // saves the pid of the child
+  int waiting; // saves the integer to see if the parents should continue waiting
+
+  cpid = Fork(); // start new process by forking, copies parent space for child
+  if(cpid == 0) {
+    if(execvp(*argv, argv) < 0) { // call execvp and check to see if it was successful
+      unix_error("ERROR: exec failed\n"); // if not successful print error message
+      exit(1); // exit with error
+    }
+  }
+  else { // for parents process ONLY
+    while(wait(&waiting) != cpid); // wait for the child to finish & reap before continuing
+  }
+  return 0;
 }
 
 void pwd(void){ // print working directory
@@ -388,3 +408,7 @@ set detach-on-fork off
 
 and then in the debugger info inferiors
 */
+/* slide 50*** important for forking */
+
+
+
