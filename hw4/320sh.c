@@ -355,6 +355,8 @@ void cd(char** args){ // change directory
   // if its just cd with no arguments, then just go to home
   char * result = malloc(MAX_INPUT); // dont forget to free this shitat some point
   char * directory = args[1]; // a cd usually only has 1 argument, a directory location
+  char* dotslash = "./";
+  char* dotdotslash = "../";
   if(directory == NULL){ // if it's just cd, go home
     strcpy(result, getenv("HOME")); // instead of setting shit equal, better to use strcpy to get deep copies
     if(chdir(result) != 0){
@@ -381,6 +383,32 @@ void cd(char** args){ // change directory
     }
     //free(result);
     return; // return with no worries
+  }else if((strncmp(directory, dotslash, 2) == 0) || (strncmp(directory, dotdotslash, 3) == 0)){ // this is going to check for the loop case
+    // count the number of ../
+    char * cursor = directory;
+    int count = 0;
+    while(*cursor != '\0'){ //
+      if(strncmp(cursor, dotslash, 2) == 0){
+        cursor = cursor + 2; // move it forwards 3, so it points at the thing after the ./
+         //only increase the count if its a ..
+      } else if (strncmp(cursor, dotdotslash, 3) == 0){
+        cursor = cursor + 3; // move it forwards 4. so it points at the thing after the ../
+        count++;
+      } else {
+        // else, its invalid, thats what else
+        unix_error("invalid directory");
+        return;
+      }
+    }
+    // now weve got count dotdots
+    for(;count != 0; count--){
+      getcwd(result, MAX_INPUT);
+      strcat(result, "/.."); // slash dot dot to go up a level
+      if(chdir(result) != 0){
+        unix_error("change directory error");
+      }
+    }
+    return; // return without worries
   } else { // its just a subdirectory
     getcwd(result, MAX_INPUT);
     strcat(result, "/");
