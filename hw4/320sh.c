@@ -21,7 +21,7 @@ char* find_filepath(char** path, char* command); // finds a legitimate path
 void unix_error(char *msg); // textbook unix error
 void mass_print(char** tokens); // will eventually print a character array
 int begin_execute(char** args); // begins execution
-int Execute(char **argv); // executes the binary -- or tries to
+int Execute(char **args); // executes the binary -- or tries to
 void cd(char** args);// change directory. uhhh, sorta half done
 void pwd(void); // print working directory
 
@@ -39,7 +39,8 @@ const char* builtins[] = {
 int main (int argc, char ** argv, char **envp) {
   // envp contains the environment variables? the PATH variable
   //PATH will be used to check wher binaries are stored
-  int finished = 0;
+
+  int finished = 0; // keeps track of running while loop
   char *prompt = "320sh> ";
   char *whitespace = " \n\r\t"; // for delimiting
   char cmd[MAX_INPUT] = ""; // the buffer, for the string
@@ -55,15 +56,25 @@ int main (int argc, char ** argv, char **envp) {
 
 
   while (!finished) { // while finish == 0
+    char *cpath = malloc(MAX_INPUT); // allocates space for the current path of the directory
+    getcwd(cpath, MAX_INPUT); // gets the current path of the directory
+
     char *cursor;
+    char *fprompt = malloc(MAX_INPUT); // allocate space for full prompt
     char last_char;
     int rv; // check writes
     int count;
     char **args; // holds arguments parsed from command
     args = args; // ... why?????? ... oh wait this is cuz that unused variable crap isn't it? okay. Got it.
 
+    // gets current path and places it into the string to print to stdout
+    strcpy(fprompt, "[");
+    strcat(fprompt, cpath);
+    strcat(fprompt, "] ");
+    strcat(fprompt, prompt);
+
     // Print the prompt and check if it is successful
-    rv = write(1, prompt, strlen(prompt));
+    rv = write(1, fprompt, strlen(fprompt));
     if (!rv) { // check to make sure it wrote correctly
       finished = 1;
       break;
@@ -84,7 +95,7 @@ int main (int argc, char ** argv, char **envp) {
    }
    *cursor = '\0'; //null terminates the cursor, so our string is now null terminated
 
-    write(1, cmd, strnlen(cmd, MAX_INPUT)); // to verify that we read input successfully
+    //write(1, cmd, strnlen(cmd, MAX_INPUT)); // to verify that we read input successfully
     args = parse_args((char*)cmd, whitespace); // parse the command from the line
 
     // see if it's 'exit ' for the sake of exiting
@@ -98,8 +109,11 @@ int main (int argc, char ** argv, char **envp) {
     }
     // ive got to search for certain commands for builtins and shit
     //cd, cd ., cd .. cd ../../ pwd (builtins)-- ls la mkdir (not builtins but try to incorporate them at a certain point)
-    Execute(args);
     begin_execute(args); // send in args to be executed
+
+    // remember to free EVERYTHING
+    free(cpath);
+    free(fprompt);
   }
 
   return 0;
@@ -212,7 +226,6 @@ static pid_t Fork(void){
 */
 void unix_error(char *msg){
   fprintf(stderr, "%s: %s\n", msg, strerror(errno));
-  exit(0);
 }
 /**
 * mass print takes an array of strings and
@@ -278,9 +291,17 @@ int begin_execute(char** args){ // args just contains the list of arguments
         return 0; // if it reaches this point, it has executed a builtin function cleanly
       }
     }
+
+    if (execution_done != 1) { // if it's not a builtin, assume executable
+      Execute(args);
+      return 0;
+    }
+
+    // SHAKEEB : ) I HAVE NO IDEA WHAT THIS CODE IS FOR v I commented it out though and everything still worked so plz explain
+
     // if it reaches this point without finding a builtin, then its an executable
     // check if it has a slash (/), or a dot slash (./), cuz then we dont need to pass it through the filepath checking
-    char a, b;
+    /*char a, b;
     a = *cmd_holder; // the first character
     b = *(cmd_holder+1); // the second character
     if(a == '/'){
@@ -311,8 +332,9 @@ int begin_execute(char** args){ // args just contains the list of arguments
         // yay
         debug("filepath: %s\n", filepath);
       }
+    }*/
 
-    }
+    // SHAKEEB : ) I HAVE NO IDEA WHAT THIS CODE IS FOR ^ I commented it out though and everything still worked so plz explain
     return 1;
 
     //Execute(char **args);
@@ -320,13 +342,13 @@ int begin_execute(char** args){ // args just contains the list of arguments
 
 }
 
-int Execute(char **argv) {
+int Execute(char **args) {
   pid_t cpid; // saves the pid of the child
   int waiting; // saves the integer to see if the parents should continue waiting
 
   cpid = Fork(); // start new process by forking, copies parent space for child
   if(cpid == 0) {
-    if(execvp(*argv, argv) < 0) { // call execvp and check to see if it was successful
+    if(execvp(*args, args) < 0) { // call execvp and check to see if it was successful
       unix_error("ERROR: exec failed\n"); // if not successful print error message
       exit(1); // exit with error
     }
@@ -338,7 +360,7 @@ int Execute(char **argv) {
 }
 
 void pwd(void){ // print working directory
-  char * result = malloc(MAX_INPUT);
+  char *result = malloc(MAX_INPUT);
   getcwd(result, MAX_INPUT); // getcwd gets the current working directory
   debug("%s\n", result); // and prints the output to the screen
   // do i free that shit?
@@ -358,14 +380,14 @@ void cd(char** args){ // change directory
   // and then, remove a directory from the cwd for each .. you find.
   // if its a . dont worry about it
   // if its just cd with no arguments, then just go to home
-  char * result = malloc(MAX_INPUT); // dont forget to free this shitat some point
+  char * result = malloc(MAX_INPUT); // dont forget to free this shit at some point
   char * directory = args[1]; // a cd usually only has 1 argument, a directory location
   char* dotslash = "./";
   char* dotdotslash = "../";
   if(directory == NULL){ // if it's just cd, go home
     strcpy(result, getenv("HOME")); // instead of setting shit equal, better to use strcpy to get deep copies
     if(chdir(result) != 0){
-      unix_error("change directory error");
+      unix_error(args[1]); // if there is an error then it should print the file path & then the unix error
     }
     //free(result);
     return; // now i return with no worries
@@ -374,7 +396,7 @@ void cd(char** args){ // change directory
     strcat(result, "/"); // i need to put a slash
     strcat(result, ".."); // strcat autoappends a null, but there needs to be space for it doe
     if(chdir(result) != 0){
-      unix_error("change directory error");
+      unix_error(args[1]);
     }
     //free(result);
     return; // return with no worries
@@ -384,11 +406,12 @@ void cd(char** args){ // change directory
     strcat(result, "/");
     strcat(result, ".");
     if(chdir(result) != 0){
-      unix_error("change directory error");
+      unix_error(args[1]);
     }
     //free(result);
     return; // return with no worries
-  }else if((strncmp(directory, dotslash, 2) == 0) || (strncmp(directory, dotdotslash, 3) == 0)){ // this is going to check for the loop case
+  }
+  else if((strncmp(directory, dotslash, 2) == 0) || (strncmp(directory, dotdotslash, 3) == 0)){ // this is going to check for the loop case
     // count the number of ../
     char * cursor = directory;
     int count = 0;
@@ -410,7 +433,7 @@ void cd(char** args){ // change directory
       getcwd(result, MAX_INPUT);
       strcat(result, "/.."); // slash dot dot to go up a level
       if(chdir(result) != 0){
-        unix_error("change directory error");
+        unix_error(args[1]);
       }
     }
     return; // return without worries
@@ -419,7 +442,7 @@ void cd(char** args){ // change directory
     strcat(result, "/");
     strcat(result, directory);
     if(chdir(result) != 0){
-      unix_error("change directory error");
+      unix_error(args[1]);
     }
     return;
   }
