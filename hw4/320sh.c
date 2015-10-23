@@ -44,6 +44,7 @@ int main (int argc, char ** argv, char **envp) {
   char *prompt = "320sh> ";
   char *whitespace = " \n\r\t"; // for delimiting
   char cmd[MAX_INPUT] = ""; // the buffer, for the string
+
   // this is all path stuff
   // this just gets the PATH variable and all the possible paths
   char** path; // this holds all the paths
@@ -88,12 +89,21 @@ int main (int argc, char ** argv, char **envp) {
     //write(1, cmd, strnlen(cmd, MAX_INPUT)); // tells us that it recieved our input correctly
     // parse through cursor to make see if it's 'exit ' for the sake of exiting
     // read the input
+    int newlineFlag = 0;
     for(rv = 1, count = 0, cursor = cmd, last_char = 1; // all of the variables
 	   rv   && (++count < (MAX_INPUT-1))  && (last_char != '\n'); cursor++) { // all of the conditions
       rv = read(0, cursor, 1); // reads one byte into cursor
-     last_char = *cursor; // it holds the last character, makes sure it aint \n
-   }
-   *cursor = '\0'; //null terminates the cursor, so our string is now null terminated
+      last_char = *cursor; // it holds the last character, makes sure it aint \n
+      if (count == 1 && last_char == '\n') {
+        newlineFlag = 1;
+        break;
+      }
+    }
+    *cursor = '\0'; //null terminates the cursor, so our string is now null terminated
+
+    if (newlineFlag == 1) {
+      continue;
+    }
 
     //write(1, cmd, strnlen(cmd, MAX_INPUT)); // to verify that we read input successfully
     args = parse_args((char*)cmd, whitespace); // parse the command from the line
