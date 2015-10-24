@@ -94,7 +94,7 @@ char* find_filepath(char** paths, char* command){ // the command is something li
   int index = 0; // the index
   char* currentPath = paths[index]; // current path
   while(currentPath != NULL){
-    result = malloc(strlen(paths[index])+strlen(command)+2);// extra 2 for the / and the /0 remember to free this 
+    result = malloc(strlen(paths[index])+strlen(command)+2);// extra 2 for the / and the /0 remember to free this
     strcpy(result , paths[index]); // copies the current path into result
     result = strcat(result, "/"); // add the slash
     result = strcat(result, command); // add the command itself, automatically adds in a /0
@@ -420,9 +420,38 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
 
 void set(char **args) {
   char *variable, *setTo; // variables to hold the environment variable and what it should be set to
-  variable = strtok(args[1], "="); // find the environment variable
+  char* value = malloc(MAX_INPUT);
+  int limit = size_of_string_array(args);
+  if(limit > 2){ // i've got to piece the arguments back together
+    int i; // because zero is the command
+    for(i = 1; i < limit; i++){
+      // take that argumetn and append it onto the string
+      if(i == 1){
+        strcpy(value, args[i]); // copy it in if it's the first one
+      } else {
+        strcat(value, args[i]); // else concatenate it
+      }
+      // and then pass in this new argument string to the
+    }
+  } else {
+    strcpy(value, args[1]); //else it's all just in arg1, like it's supposed to be
+  }
+  variable = strtok(value, "="); // find the environment variable
   setTo = strtok(NULL, "="); // find what it should be set to
   setenv(variable, setTo, 1); // set the environment variable
+  free(value);
+  return;
+}
+
+int size_of_string_array(char **args){ // assume the array is double null terminated
+  // because parser double null terminates things
+  int i = 1;
+  char* cursor = args[0];
+  while(cursor != NULL){
+    i++;
+    cursor = args[i];
+  }
+  return i;
 }
 
 void echo(char **args) {
