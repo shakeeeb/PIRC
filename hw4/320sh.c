@@ -176,6 +176,7 @@ static pid_t Fork(void){
   pid_t pid;
 
   if((pid = fork()) < 0){
+    setenv("$?", "1", 1);
     unix_error("Fork Error");
   }
   return pid;
@@ -286,6 +287,7 @@ int begin_execute(char** args){ // args just contains the list of arguments
       //either this filepath is NULL, meaning the path wasn't able to be found, OR
       // its not NULL, and i found the path
       if(filepath == NULL){
+        setenv("$?", "127", 1);
         printf("%s: command not found\n", args[0]);
       } else {
         // yay
@@ -296,21 +298,27 @@ int begin_execute(char** args){ // args just contains the list of arguments
     return 1;
 }
 
-int Execute(char **args) {
+void Execute(char **args) {
   pid_t cpid; // saves the pid of the child
   int waiting; // saves the integer to see if the parents should continue waiting
+  int status = 0;
+  char *prints = malloc(MAX_INPUT);
 
   cpid = Fork(); // start new process by forking, copies parent space for child
   if(cpid == 0) {
     if(execvp(*args, args) < 0) { // call execvp and check to see if it was successful
       printf("%s: command not found\n", args[0]); // if not successful print error message
-      exit(1); // exit with error
+      exit(127); // exit with error
     }
   }
   else { // for parents process ONLY
     while(wait(&waiting) != cpid); // wait for the child to finish & reap before continuing
+    status += WEXITSTATUS(waiting);
+    snprintf(prints, MAX_INPUT, "%d", status);
+    //itoa(status, prints, 10);
+    setenv("$?", prints, 1);
   }
-  return 0;
+  free(prints);
 }
 
 void pwd(void){ // print working directory
@@ -341,6 +349,7 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
   if(directory == NULL){ // if it's just cd, go home
     strcpy(result, getenv("HOME")); // instead of setting shit equal, better to use strcpy to get deep copies
     if(chdir(result) != 0){
+      setenv("$?", "1", 1);
       unix_error(args[1]); // if there is an error then it should print the file path & then the unix error
     }
     free(result);
@@ -350,6 +359,7 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
     strcat(result, "/"); // i need to put a slash
     strcat(result, ".."); // strcat autoappends a null, but there needs to be space for it doe
     if(chdir(result) != 0){
+      setenv("$?", "1", 1);
       unix_error(args[1]);
     }
     free(result);
@@ -360,6 +370,7 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
     strcat(result, "/");
     strcat(result, ".");
     if(chdir(result) != 0){
+      setenv("$?", "1", 1);
       unix_error(args[1]);
     }
     free(result);
@@ -374,6 +385,7 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
     // setenv makes copies so i need to free currentDirHolder
     free(currentDirHolder);
     if(chdir(result) != 0){
+      setenv("$?", "1", 1);
       unix_error(args[1]);
     }
     return;
@@ -390,6 +402,7 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
         count++;
       } else {
         // else, its invalid, thats what else
+        setenv("$?", "1", 1);
         unix_error(args[1]);
         return;
       }
@@ -399,6 +412,7 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
       getcwd(result, MAX_INPUT);
       strcat(result, "/.."); // slash dot dot to go up a level
       if(chdir(result) != 0){
+        setenv("$?", "1", 1);
         unix_error(args[1]);
       }
     }
@@ -408,6 +422,7 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
     strcat(result, "/");
     strcat(result, directory);
     if(chdir(result) != 0){
+      setenv("$?", "1", 1);
       unix_error(args[1]);
     }
     return;
@@ -425,10 +440,13 @@ void set(char **args) {
   setenv(variable, setTo, 1); // set the environment variable
 }
 
-void echo(char **args) {
-  if (strcmp(args[1], "$?") != 0) { // if the arguments do not equal "$?" then simply execute
+void echo(char **args) { // echo should print the environment variable if preceded with a "$"
+  char *estatus = malloc(MAX_INPUT);
+  if (strcmp(args[1], "$?") != 0) { // if the first char of the second argument does not equal a "$"
     Execute(args);
-  } else { // if the arguments do equal "$?" print the value of the environment variable
-
+  } else { // if the first char does equal "$" print the value of the environment variable
+    strcpy(estatus, getenv("$?"));
+    printf("%s\n", estatus);
   }
+  free(estatus);
 }
