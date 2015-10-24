@@ -1,40 +1,6 @@
 // Devon & Shakeeb
 // aka: YoureFailingTryHarder
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <sys/stat.h>
-#include <sys/wait.h>
-
-#ifdef debug // use this statement for print debugging statements
-  #define debug(fmt, ...) printf("DEBUG: %s:%s:%d ", fmt, __FILE__, __FUNCTION__, __LINE__, ##__VA_ARGS__)
-#else
-  #define debug(fmt, ...)
-#endif
-
-/* FUNCTIONS */
-static void Exit(void); // our version of exit
-static pid_t Fork(void); // our version of fork
-char** parse_args(char* command, char* delimiter); // splits a command into a token array
-char* find_filepath(char** path, char* command); // finds a legitimate path
-void unix_error(char *msg); // prints unix error
-void mass_print(char** tokens); // will eventually print a character array
-int begin_execute(char** args); // begins execution of builtins and binaries
-int Execute(char **args); // executes the binaries if they have been found
-void cd(char** args);// change the current working directory
-void pwd(void); // print the current working directory
-
-#define MAX_INPUT 1025 // the full line + a null termination
-
-const char* builtins[] = { // these are all of our builtins
-  "cd\0",
-  "pwd\0",
-  "echo\0",
-  "set\0",
-  "exit\0"
-};
+#include "320sh.h"
 
 int main (int argc, char ** argv, char **envp) {
   // envp contains the environment variables? the PATH variable
@@ -54,6 +20,7 @@ int main (int argc, char ** argv, char **envp) {
   strcpy(pathholder, getenv("PATH")); // GETENV IS NOT REENTRANT (same copy in memory can be used by mult users)
   path = parse_args(pathholder, pathdelimiter); // pass particular path and delimeter
 
+  setenv("$?", "0", 1);
 
   while (!finished) { // while finish == 0
     char *cpath = malloc(MAX_INPUT); // allocates space for the current path of the directory
@@ -128,8 +95,6 @@ char* find_filepath(char** paths, char* command){ // the command is something li
   char* currentPath = paths[index]; // current path
   while(currentPath != NULL){
     result = malloc(strlen(paths[index])+strlen(command)+2);// extra 2 for the / and the /0 remember to free this 
-              //--> TODO: use slides to keep track of when child finishes,
-              // after child finishes then free all memory and continue in the loop.
     strcpy(result , paths[index]); // copies the current path into result
     result = strcat(result, "/"); // add the slash
     result = strcat(result, command); // add the command itself, automatically adds in a /0
@@ -269,10 +234,14 @@ int begin_execute(char** args){ // args just contains the list of arguments
             execution_done = 1; // finished executing a command
             break;
           case 2: // echo
-            //echo();
+            debug("found a builtin: %s\n", builtins[i]);
+            echo(args);
+            execution_done = 1; // finished executing a command
             break;
           case 3: // set
-            //set();
+            debug("found a builtin: %s\n", builtins[i]);
+            set(args);
+            execution_done = 1;
             break;
           case 4: //exit
             debug("found a builtin: %s\n", builtins[i]);
@@ -317,7 +286,7 @@ int begin_execute(char** args){ // args just contains the list of arguments
       //either this filepath is NULL, meaning the path wasn't able to be found, OR
       // its not NULL, and i found the path
       if(filepath == NULL){
-        unix_error(args[0]);
+        printf("%s: command not found\n", args[0]);
       } else {
         // yay
         Execute(args);
@@ -399,8 +368,9 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
     // use the getenv oldpwd
     strcpy(result, getenv("OLDPWD"));
     // now i have to set OLDPWD to be getCWD
-    char * currentDirHolder = malloc(MAX_INPUT);
-    setenv( "OLDPWD", getcwd(currentDirHolder, MAX_INPUT), 1); // overwrite needs to be nonzero to overwrite existing enviernment variables
+    char *currentDirHolder = malloc(MAX_INPUT);
+    // overwrite needs to be nonzero to overwrite existing enviernment variables
+    setenv("OLDPWD", getcwd(currentDirHolder, MAX_INPUT), 1);
     // setenv makes copies so i need to free currentDirHolder
     free(currentDirHolder);
     if(chdir(result) != 0){
@@ -409,7 +379,7 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
     return;
   } else if((strncmp(directory, dotslash, 2) == 0) || (strncmp(directory, dotdotslash, 3) == 0)){
     // count the number of ../
-    char * cursor = directory;
+    char *cursor = directory;
     int count = 0;
     while(*cursor != '\0'){ //
       if(strncmp(cursor, dotslash, 2) == 0){
@@ -446,4 +416,19 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
   unix_error("cd error");
   free(result);
   return;
+}
+
+void set(char **args) {
+  char *variable, *setTo; // variables to hold the environment variable and what it should be set to
+  variable = strtok(args[1], "="); // find the environment variable
+  setTo = strtok(NULL, "="); // find what it should be set to
+  setenv(variable, setTo, 1); // set the environment variable
+}
+
+void echo(char **args) {
+  if (strcmp(args[1], "$?") != 0) { // if the arguments do not equal "$?" then simply execute
+    Execute(args);
+  } else { // if the arguments do equal "$?" print the value of the environment variable
+
+  }
 }
