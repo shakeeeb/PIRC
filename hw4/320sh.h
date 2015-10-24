@@ -22,7 +22,7 @@ char* find_filepath(char** path, char* command); // finds a legitimate path
 void unix_error(char *msg); // prints unix error
 void mass_print(char** tokens); // will eventually print a character array
 int begin_execute(char** args); // begins execution of builtins and binaries
-int Execute(char **args); // executes the binaries if they have been found
+void Execute(char **args); // executes the binaries if they have been found
 void cd(char** args);// change the current working directory
 void pwd(void); // print the current working directory
 void set(char** args); // manipulates environment variables
