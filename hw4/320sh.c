@@ -20,7 +20,35 @@ int main (int argc, char ** argv, char **envp) {
   strcpy(pathholder, getenv("PATH")); // GETENV IS NOT REENTRANT (same copy in memory can be used by mult users)
   path = parse_args(pathholder, pathdelimiter); // pass particular path and delimeter
 
-  setenv("?", "0", 1);
+  setenv("?", "0", 1); // create "?" environment variable
+
+  // CHECK IF FILE WAS PASSED IN AT COMPILE TIME
+  int fd;
+  if (argv[1] != NULL && (strcmp(argv[1], "-d") == 0)) { // if the first argument is a "-d" check argv[2]
+    puts("2");
+    if ((argv[2] != NULL) && ((fd = open(argv[2], O_RDONLY)) > 0)) { // check to see if the second argument is null
+      puts("3");
+      parse_file(argv[2], fd); // call parse_file
+    } else { // if NULL then do nothing
+      // ... doing nothing :)
+    }
+  } else if ((argv[1] != NULL) && ((fd = open(argv[1], O_RDONLY)) > 0)) { // if the first argument is not a -d and is not NULL
+    puts("4");
+    parse_file(argv[1], fd); // call parse_file
+    puts("5");
+  }
+
+  char *ipath = malloc(MAX_INPUT); // allocates space for the initial path of the directory
+  getcwd(ipath, MAX_INPUT); // gets the initial path of the directory
+
+  char *envpath = malloc(MAX_INPUT);
+  strcpy(envpath, getenv("PATH"));
+  strcat(envpath, ":");
+  strcat(envpath, ipath); // add the path where 320sh.c is located
+  setenv("PATH", envpath, 1); // change the environment variable PATH to the new set of paths
+
+  free(ipath);
+  free(envpath);
 
   while (!finished) { // while finish == 0
     char *cpath = malloc(MAX_INPUT); // allocates space for the current path of the directory
@@ -456,4 +484,43 @@ void echo(char **args) { // echo should print the environment variable if preced
     Execute(args);
   }
   free(estatus);
+}
+
+void parse_file(char *filename, int fd) { // ASSUMES FILE HAS ALREADY BEEN OPENED!!!!
+  // read the first line of the file and see if it contains "#!"
+  char *file_line = malloc(MAX_INPUT); // malloc space for each line
+  char *ptr, **args;
+  char *whitespace = " \n\r\t";
+  int chars;
+  if (read_line(file_line, fd) > 0) {
+    //ptr = file_line;
+    //if (*ptr++ == '#' && *ptr == '!') {
+      while((chars = read_line(file_line, fd)) > 0) {
+        debug("Read Line: %s", file_line);
+        ptr = file_line;
+        if (*ptr == '#') {
+          continue;
+        } else {
+          args = parse_args(ptr, whitespace);
+          begin_execute(args);
+        }
+      }
+    //}
+  }
+}
+
+int read_line(const char *file_line, int fd) { // reads a line from a file
+  char *ptr = (char*) file_line;
+  int n, count = 0;
+  while((read(fd, ptr, 1) > 0) && *ptr != '\n') {
+    ptr++;
+    count++;
+  }
+  n = count;
+  while(n < MAX_INPUT) {
+    *ptr = '\0';
+    ptr++;
+    n++;
+  }
+  return count;
 }
