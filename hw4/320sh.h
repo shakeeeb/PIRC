@@ -32,6 +32,7 @@ void parse_file(char *filename, int fd); // parses through a file for commands
 int read_line(const char *file_line, int fd); // reads a line from the file, returns # of chars read
 
 #define MAX_INPUT 1025 // the full line + a null termination
+int dflag = 0; // initializes the debug flag
 
 const char* builtins[] = { // these are all of our builtins
   "cd\0",

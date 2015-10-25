@@ -3,6 +3,17 @@
 #include "320sh.h"
 
 int main (int argc, char ** argv, char **envp) {
+  int opt; // check for debug flag
+  while((opt = getopt(argc, argv, "d")) != -1) {
+    switch(opt) {
+      case 'd':
+        dflag++;
+        break;
+      default:
+        break;
+    }
+  }
+
   // envp contains the environment variables? the PATH variable
   //PATH will be used to check wher binaries are stored
 
@@ -250,27 +261,47 @@ int begin_execute(char** args){ // args just contains the list of arguments
         switch(i){ // i switch on the index of the builtin because it's easier
           case 0: // cd
             debug("found a builtin: %s\n", builtins[i]);
+            if (dflag == 1)
+              printf("RUNNING: cd\n");
             cd(args);
+            if (dflag == 1)
+              printf("ENDED: cd (ret=%s)\n", getenv("?"));
             execution_done = 1; // finished executing a command
             break;
           case 1: // pwd
             debug("found a builtin: %s\n", builtins[i]);
+            if (dflag == 1)
+              printf("RUNNING: pwd\n");
             pwd();
+            if (dflag == 1)
+              printf("ENDED: pwd (ret=%s)\n", getenv("?"));
             execution_done = 1; // finished executing a command
             break;
           case 2: // echo
             debug("found a builtin: %s\n", builtins[i]);
+            if (dflag == 1)
+              printf("RUNNING: echo\n");
             echo(args);
+            if (dflag == 1)
+              printf("ENDED: echo (ret=%s)\n", getenv("?"));
             execution_done = 1; // finished executing a command
             break;
           case 3: // set
             debug("found a builtin: %s\n", builtins[i]);
+            if (dflag == 1)
+              printf("RUNNING: set\n");
             set(args);
+            if (dflag == 1)
+              printf("ENDED: set (ret=%s)\n", getenv("?"));
             execution_done = 1;
             break;
           case 4: //exit
             debug("found a builtin: %s\n", builtins[i]);
+            if (dflag == 1)
+              printf("RUNNING: exit\n");
             Exit();
+            if (dflag == 1)
+              printf("ENDED: exit (ret=%s)\n", getenv("?"));
             break;
           default: // how the fuck did you get here then?
             break;
@@ -330,17 +361,19 @@ void Execute(char **args) {
 
   cpid = Fork(); // start new process by forking, copies parent space for child
   if(cpid == 0) {
+    if (dflag == 1)
+      printf("RUNNING: %s\n", args[0]); // print the running portion TODO: add flag
     if(execvp(*args, args) < 0) { // call execvp and check to see if it was successful
       printf("%s: command not found\n", args[0]); // if not successful print error message
       exit(127); // exit with error
     }
-    //exit(0);
   }
   else { // for parents process ONLY
     while(wait(&waiting) != cpid); // wait for the child to finish & reap before continuing
     status += WEXITSTATUS(waiting);
     snprintf(prints, MAX_INPUT, "%d", status);
-    //itoa(status, prints, 10);
+    if (dflag == 1)
+      printf("ENDED: %s (ret=%d)\n", args[0], status); // print ending portion TODO: add flag
     setenv("?", prints, 1);
   }
   free(prints);
@@ -354,6 +387,7 @@ void pwd(void){ // print working directory
   free(result);
   // also idk what to do in the case of an error here,
   // or even how i would get an error here
+  setenv("?", "0", 1);
   return;
 }
 
@@ -376,6 +410,8 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
     if(chdir(result) != 0){
       setenv("?", "1", 1);
       unix_error(args[1]); // if there is an error then it should print the file path & then the unix error
+    } else {
+      setenv("?", "0", 1);
     }
     free(result);
     return; // now i return with no worries
@@ -386,6 +422,8 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
     if(chdir(result) != 0){
       setenv("?", "1", 1);
       unix_error(args[1]);
+    } else {
+      setenv("?", "0", 1);
     }
     free(result);
     return; // return with no worries
@@ -397,6 +435,8 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
     if(chdir(result) != 0){
       setenv("?", "1", 1);
       unix_error(args[1]);
+    } else {
+      setenv("?", "0", 1);
     }
     free(result);
     return; // return with no worries
@@ -412,6 +452,8 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
     if(chdir(result) != 0){
       setenv("?", "1", 1);
       unix_error(args[1]);
+    } else {
+      setenv("?", "0", 1);
     }
     return;
   } else if((strncmp(directory, dotslash, 2) == 0) || (strncmp(directory, dotdotslash, 3) == 0)){
@@ -439,6 +481,8 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
       if(chdir(result) != 0){
         setenv("?", "1", 1);
         unix_error(args[1]);
+      } else {
+        setenv("?", "0", 1);
       }
     }
     return; // return without worries
@@ -449,6 +493,8 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
     if(chdir(result) != 0){
       setenv("?", "1", 1);
       unix_error(args[1]);
+    } else {
+      setenv("?", "0", 1);
     }
     return;
   }
@@ -463,6 +509,7 @@ void set(char **args) {
   variable = strtok(args[1], "="); // find the environment variable
   setTo = strtok(NULL, "="); // find what it should be set to
   setenv(variable, setTo, 1); // set the environment variable
+  setenv("?", "0", 1);
 }
 
 void echo(char **args) { // echo should print the environment variable if preceded with a "$"
@@ -474,6 +521,7 @@ void echo(char **args) { // echo should print the environment variable if preced
     if (getenv(envariable) != NULL) {
       strcpy(estatus, getenv(envariable));
       printf("%s\n", estatus);
+      setenv("?", "0", 1);
     } else {
       Execute(args);
     }
