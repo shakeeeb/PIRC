@@ -24,12 +24,16 @@
   void unix_error(char *msg); // prints unix error
   void mass_print(char** tokens); // will eventually print a character array
   int begin_execute(char** args); // begins execution of builtins and binaries
-  int Execute(char **args); // executes the binaries if they have been found
+  void Execute(char **args); // executes the binaries if they have been found
   void cd(char** args);// change the current working directory
   void pwd(void); // print the current working directory
   void set(char** args); // manipulates environment variables
   void echo(char **args); // provides ehco $? support
-  int size_of_string_array(char **args);
+  int size_of_string_array(char **args); // grabs the size of string array
+  char* normalize (char* command);
+  int contains(char* haystack, char* needle);
+  int find_redirect_or_pipe(char** args);
+  void Redirect(char** args, int file_descriptor, char direction);
 
   #define MAX_INPUT 1025 // the full line + a null termination
 

@@ -62,7 +62,10 @@ int main (int argc, char ** argv, char **envp) {
       continue;
     }
 
-    args = parse_args((char*)cmd, whitespace); // parse the command from the line
+    // before i parse the arguments out, i should normalize input
+    char* butt = normalize((char*)cmd);
+    printf("normalized command: %s\n", butt);
+    args = parse_args((char*)butt, whitespace); // parse the command from the line
 
     // this is just a tester command
     if(strncmp(cmd, "print", 3) == 0){
@@ -216,9 +219,13 @@ int begin_execute(char** args){ // args just contains the list of arguments
   // after parsing launch find_filepath
   // using the return from find_filepath, fork and exec.
     char *cmd_holder = args[0]; // also check size of builtins
-    int i;
+    int i, j;
     int execution_done = 0; // this checks if iv'e finished executing stuff. at certain points, i may need to return
     // based on what i've executed
+
+    // i have to check if any argument in args or arg1 is a <, >, or a |
+    j = find_redirect_or_pipe(args); //
+    j = j;
     for(i = 0; i < sizeof(builtins)/sizeof(char*); i++){
       if (strcmp(cmd_holder, builtins[i]) == 0){
         // we found a builtin
@@ -320,6 +327,49 @@ void Execute(char **args) {
   }
   free(prints);
 }
+/**
+* this is an execution with a redirection
+* file descriptor- the file descriptor of the file that im
+* if direction is '<', redirecting stdin
+* if direction is '>', redirecting stdout
+* if direction is '2', redirects stderr
+*/
+void Redirect(char **args, int file_descriptor, char direction){
+  /*
+  pid_t cpid; // the pid of the child
+  int waiting; // saves the integer to see if parents continue waiting
+  int status = 0;
+  char *prints = malloc(MAX_INPUT);
+
+  cpid = Fork();//
+
+  if(cpid == 0){
+    // this is child, dup based on direction. the child execs
+    if(direction == '<'){ // stdin
+      // dup2(oldfd, newfd)
+      dup2(STDIN_FILENO, file_descriptor);
+    } else if(direction == '>') { // stdout
+      // dup2(oldfd, newfd)
+      dup2(STDOUT_FILENO, file_descriptor);
+    } else if(direction == '2') { // stderr
+      // dup2(oldfd, newfd)
+      dup2(STDERR_FILENO, file_descriptor);
+    } else {
+      // error
+      unix_error("unable to redirect");
+    }
+
+
+  } else { // its the parent, so it waits
+    while(wait(&waiting) != cpid); // wait for the child to finish & reap before continuing
+    status += WEXITSTATUS(waiting);
+    snprintf(prints, MAX_INPUT, "%d", status);
+    //itoa(status, prints, 10);
+    setenv("$?", prints, 1);
+  }
+  free(prints);
+  */
+}
 
 void pwd(void){ // print working directory
   char *result = malloc(MAX_INPUT);
@@ -331,6 +381,47 @@ void pwd(void){ // print working directory
   // or even how i would get an error here
   return;
 }
+
+int find_redirect_or_pipe(char** args){ // this looks for a > or a < or a |
+  // this checks arg1 in particualr,
+  // as well as the whole array in general
+  // returns either: 0, 1, 2, 3
+  // 0 if nothing is there
+  // 1 if its a <
+  // 2 if its a >
+  // 3 if its a | and there can be multiple of these
+  //first check arg1
+
+  int result = 0;
+  // now check the array for this stuff
+  int k = size_of_string_array(args); //
+  int i = 0;
+  for(i = 0;i < k;i++){ //
+    if(strcmp(args[i], "<")){
+      result = 1;
+      return result;
+    }else if(strcmp(args[i], ">")){
+      result = 2;
+      return result;
+    }else if(strcmp(args[i], "|")){
+      result = 3;
+      return result;
+    } else {
+      result = 0;
+      return result;
+    }
+    // in this case it's just gonna be zero
+  } return 0;
+}
+
+int contains(char* haystack, char* needle){ // this some shit in the string
+  if(strstr(haystack, needle) != NULL){
+    return 1; // return 1 found
+  } else {
+    return 0; // return 0 if not found
+  }
+}
+
 
 void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE "cd -" COMMAND!!!!!!
   //gotta work in the whole ./../../.. thing
@@ -457,7 +548,10 @@ void set(char **args) {
   free(value);
   return;
 }
-
+/**
+*get size of string array
+*
+*/
 int size_of_string_array(char **args){ // assume the array is double null terminated
   // because parser double null terminates things
   int i = 1;
@@ -478,4 +572,44 @@ void echo(char **args) { // echo should print the environment variable if preced
     printf("%s\n", estatus);
   }
   free(estatus);
+}
+
+char* normalize(char* command){ // normalize the input so we dont have to deal with bullshit cases
+  char * buffer = malloc(MAX_INPUT);
+  // look for =, <, >, |, ... 2> is wierd, so fuck that shit
+  int k = strlen(command);
+  int i = 0;
+  char* cursor;
+  char* buffercursor;
+  cursor = command; //
+  buffercursor = buffer; //
+
+  for(i = 0; i < k; i++){
+    switch(*cursor){
+      case '<': //
+        strncpy(buffercursor, " < ", 3);
+        buffercursor = buffercursor + 2;
+        break;
+      case '>':
+        strncpy(buffercursor, " > ", 3);
+        buffercursor = buffercursor + 2;
+        break;
+      case '=':
+        strncpy(buffercursor, " = ", 3);
+        buffercursor = buffercursor + 2;
+        break;
+      case '|':
+        strncpy(buffercursor, " | ", 3);
+        buffercursor = buffercursor + 2;
+        break;
+      default:
+        // its just a regular character, it doesnt matter
+        // just write it
+        strncpy(buffercursor, cursor, 1); //
+        break;
+    }
+    buffercursor = buffercursor+1;
+    cursor = cursor+1;
+  }
+  return buffer;
 }
