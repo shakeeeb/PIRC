@@ -25,20 +25,16 @@ int main (int argc, char ** argv, char **envp) {
   // CHECK IF FILE WAS PASSED IN AT COMPILE TIME
   int fd;
   if (argv[1] != NULL && (strcmp(argv[1], "-d") == 0)) { // if the first argument is a "-d" check argv[2]
-    puts("2");
     if ((argv[2] != NULL) && ((fd = open(argv[2], O_RDONLY)) > 0)) { // check to see if the second argument is null
-      puts("3");
       parse_file(argv[2], fd); // call parse_file
     } else { // if NULL then do nothing
       // ... doing nothing :)
     }
   } else if ((argv[1] != NULL) && ((fd = open(argv[1], O_RDONLY)) > 0)) { // if the first argument is not a -d and is not NULL
-    puts("4");
     parse_file(argv[1], fd); // call parse_file
-    puts("5");
   }
 
-  char *ipath = malloc(MAX_INPUT); // allocates space for the initial path of the directory
+  /*char *ipath = malloc(MAX_INPUT); // allocates space for the initial path of the directory
   getcwd(ipath, MAX_INPUT); // gets the initial path of the directory
 
   char *envpath = malloc(MAX_INPUT);
@@ -48,7 +44,7 @@ int main (int argc, char ** argv, char **envp) {
   setenv("PATH", envpath, 1); // change the environment variable PATH to the new set of paths
 
   free(ipath);
-  free(envpath);
+  free(envpath);*/
 
   while (!finished) { // while finish == 0
     char *cpath = malloc(MAX_INPUT); // allocates space for the current path of the directory
@@ -338,6 +334,7 @@ void Execute(char **args) {
       printf("%s: command not found\n", args[0]); // if not successful print error message
       exit(127); // exit with error
     }
+    //exit(0);
   }
   else { // for parents process ONLY
     while(wait(&waiting) != cpid); // wait for the child to finish & reap before continuing
@@ -493,19 +490,16 @@ void parse_file(char *filename, int fd) { // ASSUMES FILE HAS ALREADY BEEN OPENE
   char *whitespace = " \n\r\t";
   int chars;
   if (read_line(file_line, fd) > 0) {
-    //ptr = file_line;
-    //if (*ptr++ == '#' && *ptr == '!') {
-      while((chars = read_line(file_line, fd)) > 0) {
-        debug("Read Line: %s", file_line);
-        ptr = file_line;
-        if (*ptr == '#') {
-          continue;
-        } else {
+    while((chars = read_line(file_line, fd)) > 0) {
+      debug("Read Line: %s", file_line);
+      ptr = file_line;
+      if (*ptr == '#') {
+        continue;
+      } else {
           args = parse_args(ptr, whitespace);
-          begin_execute(args);
-        }
+        begin_execute(args);
       }
-    //}
+    }
   }
 }
 
