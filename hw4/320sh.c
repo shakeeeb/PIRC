@@ -71,8 +71,20 @@ int main (int argc, char ** argv, char **envp) {
     if(strncmp(cmd, "print", 3) == 0){
       mass_print(path);
     }
+    // i need to check if it's got any sort of redirection
+    // i've got to think about how to abstract things out
+    char j = find_redirect_or_pipe(args); //
+    if(j != '0'){
+      // then there is either at least one redirect or pipe
+      // worry about pipes later
+      // so based on which type of redirect it is, i either change stdin or stdout,
+      // but before i do that, i gotta look through args, and open the file itself
+      begin_redirect(args, j);
+    } else {
+      begin_execute(args);
+    }
 
-    begin_execute(args); // send in args to be executed
+     // send in args to be executed
 
     // remember to free EVERYTHING
     free(cpath);
@@ -125,6 +137,22 @@ char* find_filepath(char** paths, char* command){ // the command is something li
     return result;
   }
 
+}
+/**
+*it finds the position of a string in an array of strings
+*/
+int find_position_of_in_array(char** haystack, char* needle){
+  char* cursor;
+  int i = 0;
+  cursor = haystack[0];
+  while(cursor != NULL){
+    if(strcmp(cursor, needle) == 0){
+      return i;
+    }
+    i++;
+    cursor = haystack[i];
+  }
+  return -1;
 }
 /**
 *parse args
@@ -191,6 +219,32 @@ static pid_t Fork(void){
 void unix_error(char *msg){
   fprintf(stderr, "%s: %s\n", msg, strerror(errno));
 }
+/**slice takes a slice out of an array
+*
+*/
+char** slice(char** args, char* start, int size){
+  int i = 0;
+  // need to find start first
+  int start_index = 0;
+  for(start_index = 0; args[start_index]; start_index++){
+    if(strcmp(args[start_index], start) == 0){
+      break;
+    }
+  }
+  if(args[start_index] == NULL){
+    return NULL; // start doesnt exist in the array
+  }
+  char** result;
+  result = malloc(size+1 * sizeof(*result));
+  if(result == NULL){
+    return NULL;
+  }
+  for(i = 0; i < size; i++){
+    result[i] = strdup(args[start_index+i]);
+  }
+  result[i+1] = NULL;
+  return result;
+}
 /**
 * mass print takes an array of strings and
 * just prints them all out to the shell
@@ -208,6 +262,83 @@ void mass_print(char** tokens){ // i made this because for whatever reason, prin
   }
 }
 
+int begin_redirect(char** args, char direction){
+  // look through
+  // lets say ar edirect can only be an executable
+  char *cmd_holder = args[0];
+  int i;
+  char a, b;
+  a = *cmd_holder; // the first character
+  b = *(cmd_holder+1); // the second character
+  char* filename;
+  char* direction_as_string;
+  char** newargs;
+
+  // locate the file so i can set a pointer to it
+  int k = size_of_string_array(args);
+  for(i = 0; i<k;i++){
+    if(strcmp(args[i], ">") == 0 || strcmp(args[i], "<") == 0){ // if i've found the redirect
+      // the next token is the filename
+      //int y = sizeof(args[i]);
+      direction_as_string = args[i];
+      filename = args[i+1];
+      break;
+    }
+  }
+  int n = find_position_of_in_array(args, direction_as_string);
+  newargs = slice(args, args[0], n);
+  // open the file. but first, check if its null.
+  int fd = 0;
+  if(filename == NULL){
+    unix_error("nowhere to redirect");
+  } else { // open the file
+    if(access(filename, F_OK) != -1){
+      // file exists
+      fd = open(filename, O_RDWR, S_IRUSR|S_IWUSR); // mode is user can read and write to file
+    } else {
+      // file doesnt exist
+      fd = open(filename, O_RDWR | O_CREAT, S_IRUSR|S_IWUSR); // again, mode includes readwrite permissions
+    }
+    if(fd == -1){
+      unix_error("couldnt open file");
+      exit(127);
+    }
+  }
+ // so now i have a file descriptor in fd
+  if(a == '/'){
+    // if a is slash
+    debug("i have recognized a slash character!\n");
+    // i can send it straight to execvp with no worries
+    Redirect(newargs, fd, direction);
+  } else if ((a == '.') && (b == '/')) {
+    // if its ./ something
+    debug("i have recognized a dot slash character!\n");
+    Redirect(newargs, fd, direction);
+  } else {
+    // it doesnt have the slash or dot slash
+    // get the path
+    char** paths;
+    char* unparsedpath = malloc(strlen(getenv("PATH")) * sizeof(char)+ 1);
+    strcpy(unparsedpath, getenv("PATH"));
+     // getenv is not reentrant
+    paths = parse_args(unparsedpath, ":");
+    free(unparsedpath); // i free this, cuz i don't need it anymore
+    // and this will get the path
+    char* filepath = find_filepath(paths, cmd_holder); // i dont malloc stuff here, i malloced in find filepath
+    //either this filepath is NULL, meaning the path wasn't able to be found, OR
+    // its not NULL, and i found the path
+    if(filepath == NULL){
+      setenv("$?", "127", 1);
+      printf("%s: command not found\n", args[0]);
+    } else {
+      // yay
+      Redirect(newargs, fd, direction);
+    }
+    free(paths);
+  }
+  return 1;
+}
+
 int begin_execute(char** args){ // args just contains the list of arguments
   // also, so path isnt a constant thing nooo, we've gotta getenv(PATH) each time, because the user can change the path
   // variable
@@ -219,13 +350,10 @@ int begin_execute(char** args){ // args just contains the list of arguments
   // after parsing launch find_filepath
   // using the return from find_filepath, fork and exec.
     char *cmd_holder = args[0]; // also check size of builtins
-    int i, j;
+    int i;
     int execution_done = 0; // this checks if iv'e finished executing stuff. at certain points, i may need to return
     // based on what i've executed
-
-    // i have to check if any argument in args or arg1 is a <, >, or a |
-    j = find_redirect_or_pipe(args); //
-    j = j;
+    // else its just a normal thing
     for(i = 0; i < sizeof(builtins)/sizeof(char*); i++){
       if (strcmp(cmd_holder, builtins[i]) == 0){
         // we found a builtin
@@ -335,7 +463,7 @@ void Execute(char **args) {
 * if direction is '2', redirects stderr
 */
 void Redirect(char **args, int file_descriptor, char direction){
-  /*
+
   pid_t cpid; // the pid of the child
   int waiting; // saves the integer to see if parents continue waiting
   int status = 0;
@@ -347,19 +475,23 @@ void Redirect(char **args, int file_descriptor, char direction){
     // this is child, dup based on direction. the child execs
     if(direction == '<'){ // stdin
       // dup2(oldfd, newfd)
-      dup2(STDIN_FILENO, file_descriptor);
+      dup2(file_descriptor, STDIN_FILENO);
     } else if(direction == '>') { // stdout
       // dup2(oldfd, newfd)
-      dup2(STDOUT_FILENO, file_descriptor);
+      dup2(file_descriptor, STDOUT_FILENO);
     } else if(direction == '2') { // stderr
       // dup2(oldfd, newfd)
-      dup2(STDERR_FILENO, file_descriptor);
+      dup2(file_descriptor, STDERR_FILENO);
     } else {
       // error
       unix_error("unable to redirect");
     }
+    // after duping it, exec the program
 
-
+    if(execvp(*args, args) < 0) { // call execvp and check to see if it was successful
+      printf("%s: command not found\n", args[0]); // if not successful print error message
+      exit(127); // exit with error
+    }
   } else { // its the parent, so it waits
     while(wait(&waiting) != cpid); // wait for the child to finish & reap before continuing
     status += WEXITSTATUS(waiting);
@@ -368,7 +500,6 @@ void Redirect(char **args, int file_descriptor, char direction){
     setenv("$?", prints, 1);
   }
   free(prints);
-  */
 }
 
 void pwd(void){ // print working directory
@@ -382,7 +513,7 @@ void pwd(void){ // print working directory
   return;
 }
 
-int find_redirect_or_pipe(char** args){ // this looks for a > or a < or a |
+char find_redirect_or_pipe(char** args){ // this looks for a > or a < or a |
   // this checks arg1 in particualr,
   // as well as the whole array in general
   // returns either: 0, 1, 2, 3
@@ -392,26 +523,26 @@ int find_redirect_or_pipe(char** args){ // this looks for a > or a < or a |
   // 3 if its a | and there can be multiple of these
   //first check arg1
 
-  int result = 0;
+  char result = '0';
   // now check the array for this stuff
   int k = size_of_string_array(args); //
   int i = 0;
   for(i = 0;i < k;i++){ //
-    if(strcmp(args[i], "<")){
-      result = 1;
+    if(strcmp(args[i], "<") == 0){
+      result = '<';
       return result;
-    }else if(strcmp(args[i], ">")){
-      result = 2;
+    }else if(strcmp(args[i], ">") == 0){
+      result = '>';
+      if(strcmp(args[i - 1], "2") == 0){
+        result = '2';
+      }
       return result;
-    }else if(strcmp(args[i], "|")){
-      result = 3;
-      return result;
-    } else {
-      result = 0;
+    }else if(strcmp(args[i], "|") == 0){
+      result = '|';
       return result;
     }
     // in this case it's just gonna be zero
-  } return 0;
+  } return '0';
 }
 
 int contains(char* haystack, char* needle){ // this some shit in the string

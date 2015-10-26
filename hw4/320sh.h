@@ -9,6 +9,7 @@
   #include <errno.h>
   #include <sys/stat.h>
   #include <sys/wait.h>
+  #include <fcntl.h>
 
   #ifdef debug // use this statement for print debugging statements
     #define debug(fmt, ...) printf("DEBUG: %s:%s:%d ", fmt, __FILE__, __FUNCTION__, __LINE__, ##__VA_ARGS__)
@@ -32,8 +33,11 @@
   int size_of_string_array(char **args); // grabs the size of string array
   char* normalize (char* command);
   int contains(char* haystack, char* needle);
-  int find_redirect_or_pipe(char** args);
+  char find_redirect_or_pipe(char** args);
   void Redirect(char** args, int file_descriptor, char direction);
+  int begin_redirect(char** args, char direction);
+  int find_position_of_in_array(char** haystack, char* needle);
+  char** slice(char** args, char* start, int size);
 
   #define MAX_INPUT 1025 // the full line + a null termination
 
