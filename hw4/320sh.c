@@ -20,7 +20,7 @@ int main (int argc, char ** argv, char **envp) {
   int finished = 0; // keeps track of running while loop
   char *prompt = "320sh> ";
   char *whitespace = " \n\r\t"; // for delimiting
-  char cmd[MAX_INPUT] = ""; // the buffer, for the string
+  char cmd[MAX_INPUT_2] = ""; // the buffer, for the string
 
   // this is all path stuff
   // this just gets the PATH variable and all the possible paths
@@ -45,10 +45,10 @@ int main (int argc, char ** argv, char **envp) {
     parse_file(argv[1], fd); // call parse_file
   }
 
-  /*char *ipath = malloc(MAX_INPUT); // allocates space for the initial path of the directory
-  getcwd(ipath, MAX_INPUT); // gets the initial path of the directory
+  /*char *ipath = malloc(MAX_INPUT_2); // allocates space for the initial path of the directory
+  getcwd(ipath, MAX_INPUT_2); // gets the initial path of the directory
 
-  char *envpath = malloc(MAX_INPUT);
+  char *envpath = malloc(MAX_INPUT_2);
   strcpy(envpath, getenv("PATH"));
   strcat(envpath, ":");
   strcat(envpath, ipath); // add the path where 320sh.c is located
@@ -58,11 +58,11 @@ int main (int argc, char ** argv, char **envp) {
   free(envpath);*/
 
   while (!finished) { // while finish == 0
-    char *cpath = malloc(MAX_INPUT); // allocates space for the current path of the directory
-    getcwd(cpath, MAX_INPUT); // gets the current path of the directory
+    char *cpath = malloc(MAX_INPUT_2); // allocates space for the current path of the directory
+    getcwd(cpath, MAX_INPUT_2); // gets the current path of the directory
 
     char *cursor;
-    char *fprompt = malloc(MAX_INPUT); // allocate space for full prompt
+    char *fprompt = malloc(MAX_INPUT_2); // allocate space for full prompt
     char last_char;
     int rv; // check writes
     int count;
@@ -83,7 +83,7 @@ int main (int argc, char ** argv, char **envp) {
     // read the input
     int newlineFlag = 0;
     for(rv = 1, count = 0, cursor = cmd, last_char = 1; // all of the variables
-	   rv   && (++count < (MAX_INPUT-1))  && (last_char != '\n'); cursor++) { // all of the conditions
+	   rv   && (++count < (MAX_INPUT_2-1))  && (last_char != '\n'); cursor++) { // all of the conditions
       rv = read(0, cursor, 1); // reads one byte into cursor
       last_char = *cursor; // it holds the last character, makes sure it aint \n
       if (count == 1 && last_char == '\n') {
@@ -182,7 +182,7 @@ char** parse_args(char *command, char* delimiter){
     // if we exceed the size of the buffer, we could've dynamically reallocated but, here we dont need to
     if(spot > size){
       // dynamic reallocation
-      size += MAX_INPUT; // size increases
+      size += MAX_INPUT_2; // size increases
       result = realloc(result, size * sizeof(char*));
       if(result == NULL){
         // realloc error
@@ -295,7 +295,12 @@ int begin_execute(char** args){ // args just contains the list of arguments
               printf("ENDED: set (ret=%s)\n", getenv("?"));
             execution_done = 1;
             break;
-          case 4: //exit
+          case 4:
+            debug("found a builtin: %s\n", builtins[i]);
+            globbing(args);
+            execution_done = 1;
+            break;
+          case 5: //exit
             debug("found a builtin: %s\n", builtins[i]);
             if (dflag == 1)
               printf("RUNNING: exit\n");
@@ -313,7 +318,6 @@ int begin_execute(char** args){ // args just contains the list of arguments
         return 0; // if it reaches this point, it has executed a builtin function cleanly
       }
     }
-
     // if it reaches this point without finding a builtin, then its an executable
     // check if it has a slash (/), or a dot slash (./), cuz then we dont need to pass it through the filepath checking
     char a, b;
@@ -357,7 +361,7 @@ void Execute(char **args) {
   pid_t cpid; // saves the pid of the child
   int waiting; // saves the integer to see if the parents should continue waiting
   int status = 0;
-  char *prints = malloc(MAX_INPUT);
+  char *prints = malloc(MAX_INPUT_2);
 
   cpid = Fork(); // start new process by forking, copies parent space for child
   if(cpid == 0) {
@@ -371,7 +375,7 @@ void Execute(char **args) {
   else { // for parents process ONLY
     while(wait(&waiting) != cpid); // wait for the child to finish & reap before continuing
     status += WEXITSTATUS(waiting);
-    snprintf(prints, MAX_INPUT, "%d", status);
+    snprintf(prints, MAX_INPUT_2, "%d", status);
     if (dflag == 1)
       printf("ENDED: %s (ret=%d)\n", args[0], status); // print ending portion TODO: add flag
     setenv("?", prints, 1);
@@ -380,8 +384,8 @@ void Execute(char **args) {
 }
 
 void pwd(void){ // print working directory
-  char *result = malloc(MAX_INPUT);
-  getcwd(result, MAX_INPUT); // getcwd gets the current working directory
+  char *result = malloc(MAX_INPUT_2);
+  getcwd(result, MAX_INPUT_2); // getcwd gets the current working directory
   printf("%s\n", result); // and prints the output to the screen
   // do i free that shit? --> yes shakeeb, freeing is good and it won't segfault :P
   free(result);
@@ -389,6 +393,45 @@ void pwd(void){ // print working directory
   // or even how i would get an error here
   setenv("?", "0", 1);
   return;
+}
+
+void globbing(char **args) {
+  char *ptr = args[1];
+  char *cwdptr = malloc(MAX_INPUT_2);
+  getcwd(cwdptr, MAX_INPUT_2);
+  if (ptr != NULL && *ptr == '*') { // if globbing
+    if (dflag == 1)
+      printf("RUNNING: ls\n");
+    int found = 0;
+    char *ftype; // holds the file type
+    ptr++; // move to file type
+    DIR *directory; // current directory
+    struct dirent *entry; // current entry in directory
+    if ((directory = opendir(cwdptr)) != NULL) { // open the current directory
+      while((entry = readdir(directory)) != NULL) { // move to next entry in directory
+        if ((ftype = strrchr(entry->d_name, '.')) != NULL) {
+          if (strcmp(ftype, ptr) == 0) {
+            printf("%s ", entry->d_name);
+            found++;
+          }
+        }
+      }
+      puts("");
+      closedir(directory);
+    }
+    if (found == 0) {
+      printf("ls: cannot access %s: No such file or directory", args[1]);
+      setenv("?", "2", 1);
+      puts("");
+    } else {
+      setenv("?", "0", 1);
+    }
+    if (dflag == 1)
+      printf("ENDED: ls (ret=%s)\n", getenv("?"));
+  } else { // if regular ls
+    Execute(args);
+  }
+  free(cwdptr);
 }
 
 void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE "cd -" COMMAND!!!!!!
@@ -401,7 +444,7 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
   // and then, remove a directory from the cwd for each .. you find.
   // if its a . dont worry about it
   // if its just cd with no arguments, then just go to home
-  char * result = malloc(MAX_INPUT); // dont forget to free this shit at some point
+  char * result = malloc(MAX_INPUT_2); // dont forget to free this shit at some point
   char * directory = args[1]; // a cd usually only has 1 argument, a directory location
   char* dotslash = "./";
   char* dotdotslash = "../";
@@ -416,7 +459,7 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
     free(result);
     return; // now i return with no worries
   } else if(strcmp(directory, "..") == 0){
-    getcwd(result, MAX_INPUT); // copy over the current workign directory
+    getcwd(result, MAX_INPUT_2); // copy over the current workign directory
     strcat(result, "/"); // i need to put a slash
     strcat(result, ".."); // strcat autoappends a null, but there needs to be space for it doe
     if(chdir(result) != 0){
@@ -429,7 +472,7 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
     return; // return with no worries
   } else if(strcmp(directory, ".") == 0){
     // you literally dont need to do shit, but whatever
-    getcwd(result, MAX_INPUT);
+    getcwd(result, MAX_INPUT_2);
     strcat(result, "/");
     strcat(result, ".");
     if(chdir(result) != 0){
@@ -444,9 +487,9 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
     // use the getenv oldpwd
     strcpy(result, getenv("OLDPWD"));
     // now i have to set OLDPWD to be getCWD
-    char *currentDirHolder = malloc(MAX_INPUT);
+    char *currentDirHolder = malloc(MAX_INPUT_2);
     // overwrite needs to be nonzero to overwrite existing enviernment variables
-    setenv("OLDPWD", getcwd(currentDirHolder, MAX_INPUT), 1);
+    setenv("OLDPWD", getcwd(currentDirHolder, MAX_INPUT_2), 1);
     // setenv makes copies so i need to free currentDirHolder
     free(currentDirHolder);
     if(chdir(result) != 0){
@@ -476,7 +519,7 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
     }
     // now weve got count dotdots
     for(;count != 0; count--){
-      getcwd(result, MAX_INPUT);
+      getcwd(result, MAX_INPUT_2);
       strcat(result, "/.."); // slash dot dot to go up a level
       if(chdir(result) != 0){
         setenv("?", "1", 1);
@@ -487,7 +530,7 @@ void cd(char** args){ // change directory --> TODO: STILL NEED TO IMPLEMENT THE 
     }
     return; // return without worries
   } else { // its just a subdirectory
-    getcwd(result, MAX_INPUT);
+    getcwd(result, MAX_INPUT_2);
     strcat(result, "/");
     strcat(result, directory);
     if(chdir(result) != 0){
@@ -514,7 +557,7 @@ void set(char **args) {
 
 void echo(char **args) { // echo should print the environment variable if preceded with a "$"
   char *envariable;
-  char *estatus = malloc(MAX_INPUT);
+  char *estatus = malloc(MAX_INPUT_2);
   if (*args[1] == 0x24) { // if the first char does equal "$" print the value of the environment variable
     envariable = args[1];
     envariable += 1;
@@ -533,7 +576,7 @@ void echo(char **args) { // echo should print the environment variable if preced
 
 void parse_file(char *filename, int fd) { // ASSUMES FILE HAS ALREADY BEEN OPENED!!!!
   // read the first line of the file and see if it contains "#!"
-  char *file_line = malloc(MAX_INPUT); // malloc space for each line
+  char *file_line = malloc(MAX_INPUT_2); // malloc space for each line
   char *ptr, **args;
   char *whitespace = " \n\r\t";
   int chars;
@@ -559,7 +602,7 @@ int read_line(const char *file_line, int fd) { // reads a line from a file
     count++;
   }
   n = count;
-  while(n < MAX_INPUT) {
+  while(n < MAX_INPUT_2) {
     *ptr = '\0';
     ptr++;
     n++;
