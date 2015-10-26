@@ -3,11 +3,14 @@
 #include "320sh.h"
 
 int main (int argc, char ** argv, char **envp) {
-  int opt; // check for debug flag
-  while((opt = getopt(argc, argv, "d")) != -1) {
+  int opt; // check for debug & time flags
+  while((opt = getopt(argc, argv, "dt")) != -1) {
     switch(opt) {
-      case 'd':
+      case 'd': // debug flag
         dflag++;
+        break;
+      case 't': // time flag
+        tflag++;
         break;
       default:
         break;
@@ -35,14 +38,15 @@ int main (int argc, char ** argv, char **envp) {
 
   // CHECK IF FILE WAS PASSED IN AT COMPILE TIME
   int fd;
-  if (argv[1] != NULL && (strcmp(argv[1], "-d") == 0)) { // if the first argument is a "-d" check argv[2]
-    if ((argv[2] != NULL) && ((fd = open(argv[2], O_RDONLY)) > 0)) { // check to see if the second argument is null
-      parse_file(argv[2], fd); // call parse_file
-    } else { // if NULL then do nothing
-      // ... doing nothing :)
+  int n = 1;
+  while(argv[n] != NULL ) {
+    if ((strcmp(argv[n], "-d") == 0) || (strcmp(argv[n], "-t") == 0)) {
+      n++;
+      continue;
+    } else if ((fd = open(argv[n], O_RDONLY)) > 0) {
+      n++;
+      parse_file(argv[n], fd);
     }
-  } else if ((argv[1] != NULL) && ((fd = open(argv[1], O_RDONLY)) > 0)) { // if the first argument is not a -d and is not NULL
-    parse_file(argv[1], fd); // call parse_file
   }
 
   /*char *ipath = malloc(MAX_INPUT_2); // allocates space for the initial path of the directory
@@ -92,6 +96,7 @@ int main (int argc, char ** argv, char **envp) {
       }
     }
     *cursor = '\0'; //null terminates the cursor, so our string is now null terminated
+    start = time(0); // start timer for function
 
     if (newlineFlag == 1) { // for if they just press enter
       continue;
@@ -104,12 +109,24 @@ int main (int argc, char ** argv, char **envp) {
       mass_print(path);
     }
 
+    /*if (*args[2] == '|') {
+      puts("args 2");
+      piping(args);
+    } else if (strstr(args[1], "|") != NULL) {
+      normalize();
+      puts("args 1");
+      //piping();
+    }*/
+
     begin_execute(args); // send in args to be executed
 
     // remember to free EVERYTHING
     free(cpath);
     free(fprompt);
     free(args);
+    if(tflag == 1) {
+      print_times(start); // print the times
+    }
   }
 
   return 0;
@@ -263,7 +280,9 @@ int begin_execute(char** args){ // args just contains the list of arguments
             debug("found a builtin: %s\n", builtins[i]);
             if (dflag == 1)
               printf("RUNNING: cd\n");
+            ustart = time(0);
             cd(args);
+            uend = time(0);
             if (dflag == 1)
               printf("ENDED: cd (ret=%s)\n", getenv("?"));
             execution_done = 1; // finished executing a command
@@ -272,7 +291,9 @@ int begin_execute(char** args){ // args just contains the list of arguments
             debug("found a builtin: %s\n", builtins[i]);
             if (dflag == 1)
               printf("RUNNING: pwd\n");
+            ustart = time(0);
             pwd();
+            uend = time(0);
             if (dflag == 1)
               printf("ENDED: pwd (ret=%s)\n", getenv("?"));
             execution_done = 1; // finished executing a command
@@ -281,7 +302,9 @@ int begin_execute(char** args){ // args just contains the list of arguments
             debug("found a builtin: %s\n", builtins[i]);
             if (dflag == 1)
               printf("RUNNING: echo\n");
+            ustart = time(0);
             echo(args);
+            uend = time(0);
             if (dflag == 1)
               printf("ENDED: echo (ret=%s)\n", getenv("?"));
             execution_done = 1; // finished executing a command
@@ -290,21 +313,27 @@ int begin_execute(char** args){ // args just contains the list of arguments
             debug("found a builtin: %s\n", builtins[i]);
             if (dflag == 1)
               printf("RUNNING: set\n");
+            ustart = time(0);
             set(args);
+            uend = time(0);
             if (dflag == 1)
               printf("ENDED: set (ret=%s)\n", getenv("?"));
             execution_done = 1;
             break;
           case 4:
             debug("found a builtin: %s\n", builtins[i]);
+            ustart = time(0);
             globbing(args);
+            uend = time(0);
             execution_done = 1;
             break;
           case 5: //exit
             debug("found a builtin: %s\n", builtins[i]);
             if (dflag == 1)
               printf("RUNNING: exit\n");
+            ustart = time(0);
             Exit();
+            uend = time(0);
             if (dflag == 1)
               printf("ENDED: exit (ret=%s)\n", getenv("?"));
             break;
@@ -373,7 +402,8 @@ void Execute(char **args) {
     }
   }
   else { // for parents process ONLY
-    while(wait(&waiting) != cpid); // wait for the child to finish & reap before continuing
+    rusage = malloc(MAX_INPUT_2);
+    while(wait3(&waiting, 0, rusage) != cpid); // wait for the child to finish & reap before continuing
     status += WEXITSTATUS(waiting);
     snprintf(prints, MAX_INPUT_2, "%d", status);
     if (dflag == 1)
@@ -416,13 +446,14 @@ void globbing(char **args) {
           }
         }
       }
-      puts("");
+      printf("\n");
+      fflush(stdout);
       closedir(directory);
     }
     if (found == 0) {
-      printf("ls: cannot access %s: No such file or directory", args[1]);
+      printf("ls: cannot access %s: No such file or directory\n", args[1]);
+      fflush(stdout);
       setenv("?", "2", 1);
-      puts("");
     } else {
       setenv("?", "0", 1);
     }
@@ -608,4 +639,20 @@ int read_line(const char *file_line, int fd) { // reads a line from a file
     n++;
   }
   return count;
+}
+
+void print_times(time_t start) {
+  end = time(0);
+  real = end - start;
+  puts("I hope I make it...");
+  if(rusage != NULL) {
+    user = rusage->ru_utime.tv_usec;
+    sys = rusage->ru_stime.tv_usec;
+    printf("TIMES: real=%.2fseconds user=%.2fmicroseconds sys=%.2fmircroseconds", (float)real, (float)user, (float)sys);
+    puts("");
+  } else {
+    uuser = uend - ustart;
+    printf("TIMES: real=%.2fseconds user=%.2fseconds sys=%.2fmircroseconds", (float)real, (float)uuser, (float)sys);
+    puts("");
+  }
 }
