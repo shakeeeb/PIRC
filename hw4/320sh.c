@@ -68,7 +68,7 @@ int main (int argc, char ** argv, char **envp) {
     char *cursor;
     char *fprompt = malloc(MAX_INPUT_2); // allocate space for full prompt
     char last_char;
-    int rv; // check writes
+    int rv, rw; // check writes
     int count;
     char **args; // holds arguments parsed from commands
 
@@ -86,9 +86,10 @@ int main (int argc, char ** argv, char **envp) {
     }
     // read the input
     int newlineFlag = 0;
-    for(rv = 1, count = 0, cursor = cmd, last_char = 1; // all of the variables
-	   rv   && (++count < (MAX_INPUT_2-1))  && (last_char != '\n'); cursor++) { // all of the conditions
+    for(rv = 1, rw = 1, count = 0, cursor = cmd, last_char = 1; // all of the variables
+	   rv && rw && (++count < (MAX_INPUT_2-1))  && (last_char != '\n'); cursor++) { // all of the conditions
       rv = read(0, cursor, 1); // reads one byte into cursor
+      rw = write(1, cursor, 1);
       last_char = *cursor; // it holds the last character, makes sure it aint \n
       if (count == 1 && last_char == '\n') {
         newlineFlag = 1;
