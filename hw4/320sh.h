@@ -11,6 +11,7 @@
 #include <fcntl.h>
 #include <time.h>
 #include <dirent.h>
+#include <signal.h>
 #include <sys/time.h>
 #include <sys/resource.h>
 
@@ -37,13 +38,16 @@ void echo(char **args); // provides ehco $? support
 void parse_file(char *filename, int fd); // parses through a file for commands
 int read_line(const char *file_line, int fd); // reads a line from the file, returns # of chars read
 void print_times(time_t start); // prints the times if the -t flag is set at run time
+int find_fg_bg(char **args); // checks for '&' to see if the process is a background process
+void handle_c(int sig); // handles control c (hopefully)
 
-#define MAX_INPUT_2 1025 // the full line + a null termination
+#define MAX_INPUT_2 1025 // the full line + a null 
 int dflag = 0; // initializes the debug flag
 int tflag = 0; // initializes the time flag
 suseconds_t user = 0, sys = 0; // time variables for time flags
 time_t real = 0, start = 0, end = 0, ustart = 0, uend = 0, uuser = 0; // more variables for time flags
 struct rusage *rusage; // malloc space for the rusage
+struct record **processes;
 
 const char* builtins[] = { // these are all of our builtins
   "cd\0",
@@ -52,4 +56,9 @@ const char* builtins[] = { // these are all of our builtins
   "set\0",
   "ls\0",
   "exit\0"
+};
+
+struct child {
+	pid_t pid;
+	char name[MAX_INPUT_2];
 };

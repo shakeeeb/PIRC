@@ -3,6 +3,8 @@
 #include "320sh.h"
 
 int main (int argc, char ** argv, char **envp) {
+  signal(SIGINT, handle_c);
+
   int opt; // check for debug & time flags
   while((opt = getopt(argc, argv, "dt")) != -1) {
     switch(opt) {
@@ -12,7 +14,7 @@ int main (int argc, char ** argv, char **envp) {
       case 't': // time flag
         tflag++;
         break;
-      default:
+      default: // default do nothing
         break;
     }
   }
@@ -21,7 +23,7 @@ int main (int argc, char ** argv, char **envp) {
   //PATH will be used to check wher binaries are stored
 
   int finished = 0; // keeps track of running while loop
-  char *prompt = "320sh> ";
+  char *prompt = "320sh> "; // prompt
   char *whitespace = " \n\r\t"; // for delimiting
   char cmd[MAX_INPUT_2] = ""; // the buffer, for the string
 
@@ -29,26 +31,27 @@ int main (int argc, char ** argv, char **envp) {
   // this just gets the PATH variable and all the possible paths
   char** path; // this holds all the paths
   char* pathholder; // particular path in path array
-  char* pathdelimiter = ":";
+  char* pathdelimiter = ":"; // delimeter for args
   pathholder = malloc(strlen(getenv("PATH")) * sizeof(char) + 1);
   strcpy(pathholder, getenv("PATH")); // GETENV IS NOT REENTRANT (same copy in memory can be used by mult users)
   path = parse_args(pathholder, pathdelimiter); // pass particular path and delimeter
 
-  setenv("?", "0", 1); // create "?" environment variable
+  setenv("?", "0", 1); // create "?" environment variable & set default to zero
 
   // CHECK IF FILE WAS PASSED IN AT COMPILE TIME
   int fd;
   int n = 1;
   while(argv[n] != NULL ) {
-    if ((strcmp(argv[n], "-d") == 0) || (strcmp(argv[n], "-t") == 0)) {
+    if ((strcmp(argv[n], "-d") == 0) || (strcmp(argv[n], "-t") == 0)) { // if flags, continue to next arg
       n++;
       continue;
-    } else if ((fd = open(argv[n], O_RDONLY)) > 0) {
+    } else if ((fd = open(argv[n], O_RDONLY)) > 0) { // if a non flag is found try to open and run the file
       n++;
       parse_file(argv[n], fd);
     }
   }
 
+  // CODE TO ADD CURRENT DIRECTORY AT COMPILE TIME TO PATH
   /*char *ipath = malloc(MAX_INPUT_2); // allocates space for the initial path of the directory
   getcwd(ipath, MAX_INPUT_2); // gets the initial path of the directory
 
@@ -61,18 +64,21 @@ int main (int argc, char ** argv, char **envp) {
   free(ipath);
   free(envpath);*/
 
+  // GETTING INPUT TO SHELL
   while (!finished) { // while finish == 0
     char *cpath = malloc(MAX_INPUT_2); // allocates space for the current path of the directory
     getcwd(cpath, MAX_INPUT_2); // gets the current path of the directory
 
-    char *cursor;
+    char *cursor; // current input char from user
     char *fprompt = malloc(MAX_INPUT_2); // allocate space for full prompt
-    char last_char;
+    char last_char; // last input char from user
     int rv, rw; // check writes
-    int count;
+    int count; // make sure input is < MAX_INPUT_2
     char **args; // holds arguments parsed from commands
 
-    // gets current path and places it into the string to print to stdout
+    //signal(SIGINT, handle_c);
+
+    // gets current path and places it into the string to print to stdout (with prompt)
     strcpy(fprompt, "[");
     strcat(fprompt, cpath);
     strcat(fprompt, "] ");
@@ -85,13 +91,13 @@ int main (int argc, char ** argv, char **envp) {
       break;
     }
     // read the input
-    int newlineFlag = 0;
+    int newlineFlag = 0; // check if user just inputted a '\n'
     for(rv = 1, rw = 1, count = 0, cursor = cmd, last_char = 1; // all of the variables
 	   rv && rw && (++count < (MAX_INPUT_2-1))  && (last_char != '\n'); cursor++) { // all of the conditions
       rv = read(0, cursor, 1); // reads one byte into cursor
-      rw = write(1, cursor, 1);
+      rw = write(1, cursor, 1); // writes byte that user typed (for use with launcher)
       last_char = *cursor; // it holds the last character, makes sure it aint \n
-      if (count == 1 && last_char == '\n') {
+      if (count == 1 && last_char == '\n') { // set '\n' flag if first char == '\n'
         newlineFlag = 1;
         break;
       }
@@ -110,27 +116,30 @@ int main (int argc, char ** argv, char **envp) {
       mass_print(path);
     }
 
-    /*if (*args[2] == '|') {
-      puts("args 2");
-      piping(args);
-    } else if (strstr(args[1], "|") != NULL) {
-      normalize();
-      puts("args 1");
-      //piping();
-    }*/
-
     begin_execute(args); // send in args to be executed
 
     // remember to free EVERYTHING
     free(cpath);
     free(fprompt);
     free(args);
+
+    // if time flag is set print times
     if(tflag == 1) {
-      print_times(start); // print the times
+      print_times(start);
     }
   }
 
   return 0;
+}
+
+void handle_c(int sig) {
+  write(1, "LOOK", 4);
+  exit(0);
+  // async-singal safe functions --> don't use printf, sprintf, malloc, etc
+  // preserve error number on entry and exit
+  // protect shared data structures by blocking signals
+  // declare global variables as "volatile"
+  // global flags volatile sig_atomic_t
 }
 /**
 * find_filepath
@@ -391,10 +400,12 @@ void Execute(char **args) {
   pid_t cpid; // saves the pid of the child
   int waiting; // saves the integer to see if the parents should continue waiting
   int status = 0;
+  int bg; // holds background job status for child
   char *prints = malloc(MAX_INPUT_2);
 
-  cpid = Fork(); // start new process by forking, copies parent space for child
-  if(cpid == 0) {
+  bg = find_fg_bg(args);
+  //cpid = Fork(); // start new process by forking, copies parent space for child
+  if((cpid = Fork()) == 0) {
     if (dflag == 1)
       printf("RUNNING: %s\n", args[0]); // print the running portion TODO: add flag
     if(execvp(*args, args) < 0) { // call execvp and check to see if it was successful
@@ -404,14 +415,19 @@ void Execute(char **args) {
   }
   else { // for parents process ONLY
     rusage = malloc(MAX_INPUT_2);
-    while(wait3(&waiting, 0, rusage) != cpid); // wait for the child to finish & reap before continuing
-    status += WEXITSTATUS(waiting);
-    snprintf(prints, MAX_INPUT_2, "%d", status);
+    if (!bg) {
+      while(wait3(&waiting, 0, rusage) != cpid); // wait for the child to finish & reap before continuing
+      status += WEXITSTATUS(waiting);
+      snprintf(prints, MAX_INPUT_2, "%d", status);
+    } else {
+      printf("[1] (%d) Stopped\t %s\n", (int)cpid, args[0]); // print the job id etc when stopped
+    }
     if (dflag == 1)
-      printf("ENDED: %s (ret=%d)\n", args[0], status); // print ending portion TODO: add flag
+        printf("ENDED: %s (ret=%d)\n", args[0], status); // print ending portion TODO: add flag
     setenv("?", prints, 1);
   }
   free(prints);
+  return;
 }
 
 void pwd(void){ // print working directory
@@ -428,7 +444,7 @@ void pwd(void){ // print working directory
 
 void globbing(char **args) {
   char *ptr = args[1];
-  char *cwdptr = malloc(MAX_INPUT_2);
+  char *cwdptr = malloc(MAX_INPUT_2); // holds current working directory
   getcwd(cwdptr, MAX_INPUT_2);
   if (ptr != NULL && *ptr == '*') { // if globbing
     if (dflag == 1)
@@ -440,18 +456,18 @@ void globbing(char **args) {
     struct dirent *entry; // current entry in directory
     if ((directory = opendir(cwdptr)) != NULL) { // open the current directory
       while((entry = readdir(directory)) != NULL) { // move to next entry in directory
-        if ((ftype = strrchr(entry->d_name, '.')) != NULL) {
-          if (strcmp(ftype, ptr) == 0) {
-            printf("%s ", entry->d_name);
-            found++;
+        if ((ftype = strrchr(entry->d_name, '.')) != NULL) { // if entry contains a '.' (extension)
+          if (strcmp(ftype, ptr) == 0) { // if the typed extension matches this file extension
+            printf("%s ", entry->d_name); // print the file w/ extension
+            found++; // say we found something
           }
         }
       }
       printf("\n");
       fflush(stdout);
-      closedir(directory);
+      closedir(directory); // close the current directory when done
     }
-    if (found == 0) {
+    if (found == 0) { // if we found nothing print error
       printf("ls: cannot access %s: No such file or directory\n", args[1]);
       fflush(stdout);
       setenv("?", "2", 1);
@@ -612,16 +628,14 @@ void parse_file(char *filename, int fd) { // ASSUMES FILE HAS ALREADY BEEN OPENE
   char *ptr, **args;
   char *whitespace = " \n\r\t";
   int chars;
-  if (read_line(file_line, fd) > 0) {
-    while((chars = read_line(file_line, fd)) > 0) {
-      debug("Read Line: %s", file_line);
-      ptr = file_line;
-      if (*ptr == '#') {
-        continue;
-      } else {
-          args = parse_args(ptr, whitespace);
-        begin_execute(args);
-      }
+  while((chars = read_line(file_line, fd)) > 0) { // while there are lines in the file
+    debug("Read Line: %s", file_line);
+    ptr = file_line; // point to beginning of file line
+    if (*ptr == '#') { // if beginning of file line == '#' then it's a comment
+      continue; // ignore line
+    } else { // esle run the command
+      args = parse_args(ptr, whitespace);
+      begin_execute(args);
     }
   }
 }
@@ -629,12 +643,12 @@ void parse_file(char *filename, int fd) { // ASSUMES FILE HAS ALREADY BEEN OPENE
 int read_line(const char *file_line, int fd) { // reads a line from a file
   char *ptr = (char*) file_line;
   int n, count = 0;
-  while((read(fd, ptr, 1) > 0) && *ptr != '\n') {
+  while((read(fd, ptr, 1) > 0) && *ptr != '\n') { // read each character until you meet a '\n'
     ptr++;
     count++;
   }
   n = count;
-  while(n < MAX_INPUT_2) {
+  while(n < MAX_INPUT_2) { // null terminate string to erase previous line in pointer
     *ptr = '\0';
     ptr++;
     n++;
@@ -642,18 +656,33 @@ int read_line(const char *file_line, int fd) { // reads a line from a file
   return count;
 }
 
-void print_times(time_t start) {
+void print_times(time_t start) { // print times for the -t flag
   end = time(0);
   real = end - start;
   puts("I hope I make it...");
-  if(rusage != NULL) {
+  if(rusage != NULL) { // if the command was a binary or used execute
     user = rusage->ru_utime.tv_usec;
     sys = rusage->ru_stime.tv_usec;
     printf("TIMES: real=%.2fseconds user=%.2fmicroseconds sys=%.2fmircroseconds", (float)real, (float)user, (float)sys);
     puts("");
-  } else {
+  } else { // if the command was a builtin
     uuser = uend - ustart;
     printf("TIMES: real=%.2fseconds user=%.2fseconds sys=%.2fmircroseconds", (float)real, (float)uuser, (float)sys);
     puts("");
   }
+}
+
+int find_fg_bg(char **args) { // sees if process is a background process or a foreground process based on '&'
+  int bg = 0; // returns 0 if FOREGROUND process, 1 if BACKGROUND
+  char *ptr = args[0];
+  while(*ptr != '\0') { // THIS IS NOT GOING TO WORK USE SHAKEEB'S NORMALIZER
+    if (*ptr == '&') {
+      bg = 1;
+    }
+    ptr++;
+  }
+  if (args[1] != NULL && *args[1] == '&') { // check to see if process is a background process
+    bg = 1; // send command to background
+  }
+  return bg; // return if background or not
 }
