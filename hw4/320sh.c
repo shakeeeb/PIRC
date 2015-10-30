@@ -3,7 +3,8 @@
 #include "320sh.h"
 
 int main (int argc, char ** argv, char **envp) {
-  signal(SIGINT, handle_c);
+  shell = getpid(); // the pid of the shell itself
+  //fgroup = setpgid(shell, 0); // get the foreground process group starting with shell
 
   int opt; // check for debug & time flags
   while((opt = getopt(argc, argv, "dt")) != -1) {
@@ -37,6 +38,14 @@ int main (int argc, char ** argv, char **envp) {
   path = parse_args(pathholder, pathdelimiter); // pass particular path and delimeter
 
   setenv("?", "0", 1); // create "?" environment variable & set default to zero
+
+  //sigset_t mask, cmask, pmask;
+  //sigfillset(&mask);
+  //sigemptyset(&cmask);
+  //sigaddset(&cmask, SIGINT);
+  //sigprocmask(SIG_BLOCK, &mask, &pmask);
+  signal(SIGINT, handle_c);
+  //sigprocmask(SIG_SETMASK, &pmask, NULL);
 
   // CHECK IF FILE WAS PASSED IN AT COMPILE TIME
   int fd;
@@ -75,8 +84,6 @@ int main (int argc, char ** argv, char **envp) {
     int rv, rw; // check writes
     int count; // make sure input is < MAX_INPUT_2
     char **args; // holds arguments parsed from commands
-
-    //signal(SIGINT, handle_c);
 
     // gets current path and places it into the string to print to stdout (with prompt)
     strcpy(fprompt, "[");
@@ -133,8 +140,22 @@ int main (int argc, char ** argv, char **envp) {
 }
 
 void handle_c(int sig) {
-  write(1, "LOOK", 4);
-  exit(0);
+  write(1, "^C", 3);
+  sigset_t mask, pmask;
+  sigfillset(&mask);
+  int i = 0;
+  while(job_list[i] != NULL) {
+    //if (job_list[i]->gpid == fgroup) {
+      sigprocmask(SIG_BLOCK, &mask, &pmask);
+      kill(job_list[i]->pid, SIGINT);
+      sigprocmask(SIG_SETMASK, &pmask, NULL);
+    //}
+  }
+  //kill(0, SIGINT);
+  //raise(SIGINT);
+  //exit(0);
+
+  //sigprocmask(SIG_SETMASK, &pmask, NULL);
   // async-singal safe functions --> don't use printf, sprintf, malloc, etc
   // preserve error number on entry and exit
   // protect shared data structures by blocking signals
@@ -330,14 +351,32 @@ int begin_execute(char** args){ // args just contains the list of arguments
               printf("ENDED: set (ret=%s)\n", getenv("?"));
             execution_done = 1;
             break;
-          case 4:
+          case 4: // globbing
             debug("found a builtin: %s\n", builtins[i]);
             ustart = time(0);
             globbing(args);
             uend = time(0);
             execution_done = 1;
             break;
-          case 5: //exit
+          case 5: // jobs
+            ustart = time(0);
+            print_jobs();
+            uend = time(0);
+            execution_done = 1;
+            break;
+          case 6: // fg
+            ustart = time(0);
+            foreground(args);
+            uend = time(0);
+            execution_done = 1;
+            break;
+          case 7: // bg
+            ustart = time(0);
+            background(args);
+            uend = time(0);
+            execution_done = 1;
+            break;
+          case 8: //exit
             debug("found a builtin: %s\n", builtins[i]);
             if (dflag == 1)
               printf("RUNNING: exit\n");
@@ -397,36 +436,52 @@ int begin_execute(char** args){ // args just contains the list of arguments
 }
 
 void Execute(char **args) {
-  pid_t cpid; // saves the pid of the child
-  int waiting; // saves the integer to see if the parents should continue waiting
-  int status = 0;
-  int bg; // holds background job status for child
-  char *prints = malloc(MAX_INPUT_2);
+  pid_t cpid, ppid; // saves the pid of the child
+  sigset_t allmask, cmask, pmask;
+  //int waiting, waitplz; // saves the integer to see if the parents should continue waiting
+  //int status = 0;
+  //int bg; // holds background job status for child
+  //char *prints = malloc(MAX_INPUT_2);
 
-  bg = find_fg_bg(args);
-  //cpid = Fork(); // start new process by forking, copies parent space for child
-  if((cpid = Fork()) == 0) {
-    if (dflag == 1)
-      printf("RUNNING: %s\n", args[0]); // print the running portion TODO: add flag
-    if(execvp(*args, args) < 0) { // call execvp and check to see if it was successful
-      printf("%s: command not found\n", args[0]); // if not successful print error message
-      exit(127); // exit with error
+  //bg = find_fg_bg(args); // see if child is foreground process or not
+  // start new process by forking, copies parent space for child
+  if((ppid = Fork()) == 0) {
+    // HANDLE SINGALS
+    sigfillset(&allmask); // set all mask
+    sigemptyset(&cmask); // set child mask to zero
+    signal(SIGCHLD, handle_child);
+    sigprocmask(SIG_BLOCK, &cmask, &pmask); // block the child process
+    if ((cpid = Fork()) == 0) {
+      sigprocmask(SIG_SETMASK, &pmask, NULL); // unblock the child within the child
+      if (dflag == 1)
+        printf("RUNNING: %s\n", args[0]); // print the running portion TODO: add flag
+      if(execvp(*args, args) < 0) { // call execvp and check to see if it was successful
+        printf("%s: command not found\n", args[0]); // if not successful print error message
+        exit(127); // exit with error
+      }
+    } else {
+      /*while(wait(&waitplz) != cpid);
+      add_job(bg, ppid, getpgid(cpid), args[0]);
+      exit(WEXITSTATUS(waitplz));*/
     }
   }
-  else { // for parents process ONLY
+  /*else { // for parents process ONLY
+    sigprocmask(SIG_BLOCK, &allmask, NULL);
+    //add_job(bg, cpid, getpgid(cpid), args[0]);
+    sigprocmask(SIG_SETMASK, &pmask, NULL);
     rusage = malloc(MAX_INPUT_2);
     if (!bg) {
-      while(wait3(&waiting, 0, rusage) != cpid); // wait for the child to finish & reap before continuing
+      while(wait3(&waiting, 0, rusage) != ppid); // wait for the child to finish & reap before continuing
       status += WEXITSTATUS(waiting);
       snprintf(prints, MAX_INPUT_2, "%d", status);
     } else {
-      printf("[1] (%d) Stopped\t %s\n", (int)cpid, args[0]); // print the job id etc when stopped
+      add_job(0, ppid, getpgid(ppid), args[0]);
     }
     if (dflag == 1)
-        printf("ENDED: %s (ret=%d)\n", args[0], status); // print ending portion TODO: add flag
+      printf("ENDED: %s (ret=%d)\n", args[0], status); // print ending portion TODO: add flag
     setenv("?", prints, 1);
   }
-  free(prints);
+  free(prints);*/
   return;
 }
 
@@ -670,6 +725,136 @@ void print_times(time_t start) { // print times for the -t flag
     printf("TIMES: real=%.2fseconds user=%.2fseconds sys=%.2fmircroseconds", (float)real, (float)uuser, (float)sys);
     puts("");
   }
+}
+
+void handle_child(int sig) {
+  sigset_t allmask, pmask;
+  pid_t cpid;
+  sigfillset(&allmask);
+  while((cpid = (waitpid(-1, NULL, 0))) > 0);
+  sigprocmask(SIG_BLOCK, &allmask, &pmask);
+  remove_job(cpid);
+  sigprocmask(SIG_SETMASK, &pmask, NULL);
+}
+
+void print_jobs() {
+  struct child *ptr;
+  int i = 0;
+  while(job_list[i] != NULL) {
+    ptr = job_list[i];
+    if (ptr->running == 1) {
+      printf("[%d] (%d) {%d} Stopped\t%s\n", ptr->jobid, ptr->pid, ptr->gpid, ptr->name);
+    } else if (ptr->running == 0) {
+      printf("[%d] (%d) {%d} Running\t%s\n", ptr->jobid, ptr->pid, ptr->gpid, ptr->name);
+    } else {
+      // do nothing --> running is negative??
+    }
+    i++;
+  }
+}
+
+void add_job(int running, pid_t pid, pid_t gpid, char *name) { // add a child to the process list
+  struct child *current;
+  current = calloc(1, sizeof(struct child));
+  //cptr = &current;
+  current->running = running;
+  current->pid = pid;
+  current->gpid = gpid;
+  char *ptr = name;
+  int i;
+  while(*ptr != '\0') {
+    current->name[i] = *ptr;
+    i++;
+    ptr++;
+  }
+  current->name[i] = '\0';
+  i = 0;
+  while(job_list[i] != NULL) {
+    i++;
+  }
+  job_list[i] = current;
+  current->jobid = (i + 1);
+  if (running == 0) {
+    printf("[%d] (%d) Running\t%s\n", current->jobid, current->pid, current->name);
+  } else {
+    printf("[%d] (%d) Stopped\t%s\n", current->jobid, current->pid, current->name);
+  }
+}
+
+void remove_job(pid_t pid) { // deletes a child from the process list
+  // child removes themselves from the job list
+  int i = 0, found = 0;
+  while(job_list[i] != NULL && found != 1) {
+    if (job_list[i]->pid == pid) {
+      free(job_list[i]);
+      job_list[i] = NULL;
+      found++;
+    }
+    i++;
+  }
+}
+
+void foreground(char **args) {
+  char *ptr = args[1];
+  pid_t pid;
+  int i = 0, found = 0, temp;
+  if(*ptr == '%') {
+    // check all the jobids for the correct job
+    ptr++;
+    temp = atoi(ptr);
+    while (job_list[i] != NULL && found == 0) {
+      if ((job_list[i]->jobid) == temp) {
+        pid = job_list[i]->pid;
+        found++;
+      }
+    }
+  } else {
+    // check all the pids for the correct job
+    temp = atoi(ptr);
+    while (job_list[i] != NULL && found == 0) {
+      if ((job_list[i]->pid) == temp) {
+        pid = job_list[i]->pid;
+        job_list[i]->gpid = fgroup;
+        found++;
+      }
+    }
+  }
+
+  // move the process to the foreground and give it a SIGCONT signal
+  kill(pid, SIGCONT);
+}
+
+void background(char **args) {
+  // handle background process
+}
+
+void stopprocess(char **args) {
+  // stop a process?
+  char *ptr = args[1];
+  pid_t pid;
+  int i = 0, found = 0, temp;
+  if(*ptr == '%') {
+    // check all the jobids for the correct job
+    ptr++;
+    temp = atoi(ptr);
+    while (job_list[i] != NULL && found == 0) {
+      if ((job_list[i]->jobid) == temp) {
+        pid = job_list[i]->pid;
+        found++;
+      }
+    }
+  } else {
+    // check all the pids for the correct job
+    temp = atoi(ptr);
+    while (job_list[i] != NULL && found == 0) {
+      if ((job_list[i]->pid) == temp) {
+        pid = job_list[i]->pid;
+        found++;
+      }
+    }
+  }
+  // move the process to the foreground and give it a SIGCONT signal
+  kill(pid, SIGTSTP);
 }
 
 int find_fg_bg(char **args) { // sees if process is a background process or a foreground process based on '&'
