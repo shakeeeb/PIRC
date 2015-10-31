@@ -137,6 +137,18 @@ int main (int argc, char ** argv, char **envp) {
       continue;
     }
 
+    cursor = cmd;
+    while(*cursor != '\0') {
+      if (*cursor == '&') {
+        *cursor = ' ';
+        cursor++;
+        *cursor = '&';
+        cursor++;
+        *cursor = '\0';
+      }
+      cursor++;
+    }
+
     // before i parse the arguments out, i should normalize input
     char* butt = normalize((char*)cmd);
     debug("normalized command: %s\n", butt);
@@ -1156,7 +1168,7 @@ int contains(char* haystack, char* needle){ // this some shit in the string
   }
 }
 
-void globbing(char **args) {
+void globbing(char *args) {
   char *ptr = args[1];
   char *cwdptr = malloc(MAX_INPUT_2); // holds current working directory
   getcwd(cwdptr, MAX_INPUT_2);
@@ -1445,7 +1457,6 @@ int read_line(const char *file_line, int fd) { // reads a line from a file
 void print_times(time_t start) { // print times for the -t flag
   end = time(0);
   real = end - start;
-  puts("I hope I make it...");
   if(rusage != NULL) { // if the command was a binary or used execute
     user = rusage->ru_utime.tv_usec;
     sys = rusage->ru_stime.tv_usec;
