@@ -3,3 +3,39 @@ file should describe what you did, what approach you took, results of any
 measurements you made, which files are included in your submission and what
 they are for, etc.  Feel free to include any other information you think is
 helpful to us in this README; it can only help your grade.
+Yourefailingtryharder
+
+Devon Maguire (109284550)
+Shakeeb Saleh (109239204)
+
+Finished/Unfinished:
+
+Part I --
+Everything
+
+Part II --
+Scripting
+Redirection
+multiple redirection
+Piping (one pipe)
+
+Part III --
+'&', 'jobs', and 'fg' work
+'bg', 'kill', Ctrl-C, and Ctrl+Z do not work.
+Keeps history --> does not work w/ up/down arrows
+
+Extra Credit --
+1. history and clear-history work
+2. backspace, no up/down arrow
+3. -t flag works
+4. globbing works
+5. n/a
+
+Included Files: 320sh.c 320sh.h Makefile launcher.sh README
+
+Part we implemented using the execvp() call for creating new processes
+from the binaries given in the PATH environment variable directories.
+our builtins we didnt fork for, so our builtins are handled by the arent process, meaning that redirection or job control on builtins doesnt work, or rather wasnt implemented. Scripting support was really checking arguments that were passed in, and then subsequently executed by the progrm WERE RUNING OUTTA TIME
+SORRY THANKY WILL EXPLAIN SORRY JWONG
+Chat Conversation End
+
