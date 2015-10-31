@@ -26,7 +26,7 @@ int main (int argc, char ** argv, char **envp) {
   int finished = 0; // keeps track of running while loop
   char *prompt = "320sh> "; // prompt
   char *whitespace = " \n\r\t"; // for delimiting
-  char cmd[MAX_INPUT_2] = ""; // the buffer, for the string
+  char *cmd = malloc(MAX_INPUT_2); // the buffer, for the string
 
   // this is all path stuff
   // this just gets the PATH variable and all the possible paths
@@ -97,13 +97,34 @@ int main (int argc, char ** argv, char **envp) {
       finished = 1;
       break;
     }
+    int i = 0;
+    cursor = cmd;
     // read the input
     int newlineFlag = 0; // check if user just inputted a '\n'
-    for(rv = 1, rw = 1, count = 0, cursor = cmd, last_char = 1; // all of the variables
+    for(rv = 1, rw = 1, count = 0, /*cursor = cmd, */last_char = 1; // all of the variables
 	   rv && rw && (++count < (MAX_INPUT_2-1))  && (last_char != '\n'); cursor++) { // all of the conditions
       rv = read(0, cursor, 1); // reads one byte into cursor
-      rw = write(1, cursor, 1); // writes byte that user typed (for use with launcher)
+      i++;
+
+      if ((*cursor == 127 || *cursor == 8) && count != 0) {
+        count--;
+        if (count > 0) {
+          //printf("\b\003[K");
+          write(1, "\b\003[K", 1);
+          write(1, " ", 1);
+          write(1, "\b\003[K", 1);
+          cursor--;
+          cursor--;
+          //cmd[i-1] = '\0';
+          count--;
+          continue;
+        }
+      } else {
+        rw = write(1, cursor, 1); // writes byte that user typed (for use with launcher)
+      }
+
       last_char = *cursor; // it holds the last character, makes sure it aint \n
+
       if (count == 1 && last_char == '\n') { // set '\n' flag if first char == '\n'
         newlineFlag = 1;
         break;
@@ -151,7 +172,7 @@ int main (int argc, char ** argv, char **envp) {
       print_times(start);
     }
   }
-
+  free(cmd);
   return 0;
 }
 /*
