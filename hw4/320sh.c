@@ -1242,7 +1242,7 @@ int contains(char* haystack, char* needle){ // this some shit in the string
   }
 }
 
-void globbing(char *args) {
+void globbing(char **args) {
   char *ptr = args[1];
   char *cwdptr = malloc(MAX_INPUT_2); // holds current working directory
   getcwd(cwdptr, MAX_INPUT_2);

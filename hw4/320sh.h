@@ -61,6 +61,8 @@
   void background(char **args); // moves a process into the background
   void stopprocess(char **args); // stopps a process
   int find_fg_bg(char **args); // checks for '&' to see if the process is a background process
+  void History();
+  void clear_History();
 
 
   #define MAX_INPUT_2 1025 // the full line + a null termination
