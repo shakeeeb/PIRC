@@ -60,6 +60,8 @@ time_t real = 0, start = 0, end = 0, ustart = 0, uend = 0, uuser = 0; // more va
 struct rusage *rusage; // malloc space for the rusage
 struct child *job_list[MAX_INPUT_2]; // create a list for jobs
 
+volatile sig_atomic_t listening;
+
 const char* builtins[] = { // these are all of our builtins
   "cd\0",
   "pwd\0",
