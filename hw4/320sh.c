@@ -320,11 +320,13 @@ int process_pipes(char** args){
         break; // breka out of the for loop
       }
     }
-    call_redirect = slice(args, cursor, size_of_clause); // this might jsut be size of clause - 1
+    call_redirect = slice(args, cursor, size_of_clause - 1); // this might jsut be size of clause - 1
     cursor = secondary_cursor; // resetting the cursor to the position of the secondary cursor
     if(read_from_hidden == 1){
       // in this case, it reads from  hidden.txt
       pipe(fd); // so i call pipe here?
+      Close(hiddendottxt);
+      hiddendottxt = open(".hidden.txt", O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
       Redirect(hiddendottxt, fd[1], STDERR_FILENO ,call_redirect);// call redirect straight, ive got shit already
       Close(fd[1]); // close the write end, child messes with taht shit
       // keep the read end of the pipe
@@ -373,9 +375,15 @@ int process_pipes(char** args){
   } else if (c == '|'){ // it could possibly be a single pipe
     // in which case, i have to read into that command from hiddendottxt
     // i might need to close it, and then open it again
-    int w = size_of_string_array(arraycursor); // arraycursor includes the pipe itself
-    call_redirect = slice(args, arraycursor[1], w - 1);
-    Redirect(hiddendottxt, STDOUT_FILENO, STDERR_FILENO, call_redirect); // this isn't working idk why
+    if(read_from_hidden == 1){
+      Close(hiddendottxt);
+      hiddendottxt = open(".hidden.txt", O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+      int w = size_of_string_array(arraycursor); // arraycursor includes the pipe itself
+      call_redirect = slice(args, arraycursor[1], w - 1);
+      Redirect(hiddendottxt, STDOUT_FILENO, STDERR_FILENO, call_redirect);
+    } else {
+      Redirect(fd[0], STDOUT_FILENO, STDERR_FILENO, call_redirect);
+    }
   }
   // this is the true end of the function
   // so all cleanup can take place here

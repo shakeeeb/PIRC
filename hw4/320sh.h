@@ -65,8 +65,8 @@
 
   #define MAX_INPUT_2 1025 // the full line + a null termination
   extern char* environ;
-  //char history[50][1025];
-  //int history_index = 0;
+  char history[50][1025];
+  int history_index = 0;
   pid_t shell; // the pid of the shell itself
   pid_t fgroup; // get the foreground process group starting with shell
   pid_t bgroup; // get the background process group
