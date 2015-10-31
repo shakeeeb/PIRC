@@ -67,6 +67,7 @@
   extern char* environ;
   char history[50][1025];
   int history_index = 0;
+  char history_filepath[1025] ;
   pid_t shell; // the pid of the shell itself
   pid_t fgroup; // get the foreground process group starting with shell
   pid_t bgroup; // get the background process group
@@ -88,7 +89,9 @@
 	  "jobs\0",
 	  "fg\0",
 	  "bg\0",
-	  "exit\0"
+	  "exit\0",
+    "history\0"
+    "clear-history\0"
 	};
 
   struct child {

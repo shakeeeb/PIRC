@@ -39,6 +39,33 @@ int main (int argc, char ** argv, char **envp) {
 
   setenv("?", "0", 1); // create "?" environment variable & set default to zero
 
+  //readout the history from the history file
+  //HISTORY
+
+  FILE* fpointer = fopen(".history.txt", "r+");
+  if(fpointer == NULL){
+    fpointer = fopen(".history.txt", "w+");
+  }
+  char* intermediary = malloc(1025);
+  int col = 0;
+  // and then set the filepath for history
+  getcwd(history_filepath, 1025);
+  strcat(history_filepath, "/.history.txt"); // it'll always be in the same working directory
+  // now i've gotta read out all of the history from the history file into the array
+  while(fgets(intermediary, 1024, fpointer) != NULL){
+    // now write each character by character into the thingie
+    for(col = 0; col < strlen(intermediary); col++){
+      if(intermediary[col] == '\n'){
+        history[history_index][col] = '\n';
+        history[history_index][col+1] = '\0';
+        break;
+      }
+      history[history_index][col] = intermediary[col];
+    }
+    history_index++;
+  }
+  fclose(fpointer);
+
   //sigset_t mask, cmask, pmask;
   //sigfillset(&mask);
   //sigemptyset(&cmask);
@@ -111,13 +138,24 @@ int main (int argc, char ** argv, char **envp) {
     }
     *cursor = '\0'; //null terminates the cursor, so our string is now null terminated
     start = time(0); // start timer for function
-
     if (newlineFlag == 1) { // for if they just press enter
       continue;
     }
 
     // before i parse the arguments out, i should normalize input
     char* butt = normalize((char*)cmd);
+    // here i can take a line, and place it into the array of characters
+    // HISTORY
+    if(history_index  == 50){
+      history_index = 0;
+    }
+    int e = 0;
+    for(e = 0; e < 1025 ;e++){
+      history[history_index][e] = cmd[e];
+    }
+    strcat(history[history_index], "\0"); // place a newline for the sake of whatever
+    history_index++;
+
     debug("normalized command: %s\n", butt);
     args = parse_args((char*)butt, whitespace); // parse the command from the line
 
@@ -523,6 +561,20 @@ char** parse_args(char *command, char* delimiter){
 *
 */
 static void Exit(void){
+  // before exit, write the history array to the history file
+  // HISTORY
+  FILE* fpointer = fopen(history_filepath, "r+");
+  int i = 0;
+  int j = 0;
+  for(i = 0; i < 50;i++){
+    for(j = 0; j < sizeof(history[i]) ;j++){
+      if(history[i][j] == '\0'){
+        break;
+      }
+      fputc(history[i][j], fpointer);
+    }
+  }
+  fclose(fpointer);
   exit(3);
 }
 /**
@@ -934,6 +986,20 @@ int begin_execute(char** args){ // args just contains the list of arguments
             if (dflag == 1)
               printf("ENDED: exit (ret=%s)\n", getenv("?"));
             break;
+          case 9: // history
+            debug("found a builtin: %s\n", builtins[i]);
+            if(dflag == 1)
+              printf("RUNNING: history\n");
+            ustart = time(0);
+            History();
+            uend = time(0);
+          case 10:
+          debug("found a builtin: %s\n", builtins[i]);
+          if(dflag == 1)
+            printf("RUNNING: clear-history\n");
+          ustart = time(0);
+          clear_History();
+          uend = time(0);
           default: // how the fuck did you get here then?
             break;
 
@@ -1589,4 +1655,21 @@ int find_fg_bg(char **args) { // sees if process is a background process or a fo
     bg = 1; // send command to background
   }
   return bg; // return if background or not
+}
+
+void History(){
+  // this just prints out the file
+  FILE * fpointer = fopen(history_filepath, "r");
+  int count = 0;
+  char* intermediary = malloc(1025);
+  while(fgets(intermediary, 1025, fpointer) != NULL){
+    printf("%d %s", count, intermediary);
+    count++;
+  }
+  fclose(fpointer);
+}
+
+void clear_History(){
+  FILE* fpointer = fopen(history_filepath, "w+");
+  fclose(fpointer);
 }
