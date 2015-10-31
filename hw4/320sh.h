@@ -77,17 +77,19 @@
   struct rusage *rusage; // malloc space for the rusage
   struct child *job_list[MAX_INPUT_2]; // create a list for jobs
 
-  const char* builtins[] = { // these are all of our builtins
-    "cd\0",
-    "pwd\0",
-    "echo\0",
-    "set\0",
-    "ls\0",
-    "jobs\0",
-    "fg\0",
-    "bg\0",
-    "exit\0"
-  };
+	volatile sig_atomic_t listening;
+
+	const char* builtins[] = { // these are all of our builtins
+	  "cd\0",
+	  "pwd\0",
+	  "echo\0",
+	  "set\0",
+	  "ls\0",
+	  "jobs\0",
+	  "fg\0",
+	  "bg\0",
+	  "exit\0"
+	};
 
   struct child {
 	  int running; // 1 if stopped

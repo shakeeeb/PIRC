@@ -604,7 +604,7 @@ void unix_error(char *msg){
 /**slice takes a slice out of an array
 *
 */
-char** slice(char** args, char* start, int size){
+char** slice(char** args, char* start, int size) {
   int i = 0;
   // need to find start first
   int start_index = 0;
@@ -638,7 +638,7 @@ char** slice(char** args, char* start, int size){
 * mass print takes an array of strings and
 * just prints them all out to the shell
 */
-void mass_print(char** tokens){ // i made this because for whatever reason, printf wasn't working for me.
+void mass_print(char** tokens) { // i made this because for whatever reason, printf wasn't working for me.
 // by changing all possible prints to writes, we dont need to worry about streaming output to other files though
 // assuming tokens is a null terminated array
   int index = 0;
@@ -1008,7 +1008,8 @@ void Execute(char **args) {
         exit(127); // exit with error
       }
     } else {
-      add_job(bg, ppid, getpgid(cpid), args[0]);
+      while(wait(&waitplz) != cpid);
+      //add_job(bg, ppid, getpgid(cpid), args[0]);
       exit(WEXITSTATUS(waitplz));
     }
   }
@@ -1448,10 +1449,11 @@ void handle_child(int sig) {
   sigset_t allmask, pmask;
   pid_t cpid;
   sigfillset(&allmask);
-  while((cpid = (waitpid(-1, NULL, 0))) > 0);
-  sigprocmask(SIG_BLOCK, &allmask, &pmask);
-  remove_job(cpid);
-  sigprocmask(SIG_SETMASK, &pmask, NULL);
+  while((cpid = (waitpid(-1, NULL, 0))) > 0) {
+    sigprocmask(SIG_BLOCK, &allmask, &pmask);
+    remove_job(cpid);
+    sigprocmask(SIG_SETMASK, &pmask, NULL);
+  }
 }
 
 void print_jobs() {
