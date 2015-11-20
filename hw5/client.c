@@ -8,28 +8,142 @@ int main (int argc, char** argv){
 
   // the first argument could also be -h, which is help. if it's -h, print out the help menu
   // elsewise, don't print out the help menu. just do shit.
-  char* host, char* port;
+  char* host;
+  char* port;
   char buffer[MAXLEN];
+  char* intermediary;
   int sock_fd = 0;
-  int n = 0;
+  int bytes_sent = 0;
   int j = 0; // location is argv changes based on (lack) of a help menu
-
-  if(argc != 4){
+  int running = 0;
+  fd_set readfds;
+  if(argc < 4){
     unix_error("not enough arguments");
     exit(1);
   }
-  if(strcmp(argv[1], "-h")) // if its -h
+  if(strcmp(argv[1], "-h")){ // -h flag
+    j++;
+  }
 
-  host = argv[2]; // server ip
-  port = argv[3]; // server port
+  host = argv[j + 2]; // server ip
+  port = argv[j + 3]; // server port
 
-  clientfd = Open_clientfd(host, port); // now i have an open socket file descriptor
+  sock_fd = Open_clientfd(host, port); // now i have an open socket file descriptor
+  // this should also return the addrinfo somehow, so i have a handle to it here.
+  // initiate login by sending aloha
+  // teh question is, should i i/o multiplex before sending aloha?
+  // or should i send aloha, and then i/o multiplex after establishing a connection
+  // try the handshake, and this willr eturn 0 if successful
+  if(handshake(sock_fd) != 0){
+    // something happened and its up to me to find out who it was and why
+    unix_error("handshake error");
+    // lol jk youre fucked
+  }
 
+  //after this, start the io multiplexing
+  // gotta io multiplex between the socket and stdin
+  // i can select here because this isnt multithreaded
+  // int select(int numfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
+  // numfds should be highest fd + 1
+  FD_ZERO(&readfds); // zeroes it out
+  FD_SET(STDIN_FILENO, &readfds); //set stuff
+  FD_SET(sock_fd, &readfds); // sets more stuff
+  // unblock(sock_fd); honestly, why would be need to not block? doesnt blocking help,
+  //becuase it waits for input to finish
+  while(running == 0){
+    if(select(sock_fd+1, &readfds, NULL, NULL, NULL) == -1)
+    unix_error("seect error");
+    exit(4);
+  }
+  if(FD_ISSET(STDIN_FILENO, &readfds)){ // the user is sending us information
+    // fgets(buffer, maxlen, stream)
+    fgets(buffer, MAXLEN, STDIN_FILENO); //get the command from the user
+    //check if it's a slash command, otherwise it's just a regular message
+    char c = buffer[0]; //the first character of the buffer needs to be a /
+    if(c != '/'){ // its a message
+      // append msg and send message msg is 12
+      intermediary = malloc(MAXLEN+24);
+      snprintf(intermediary, MAXLEN, "%s %s", verbs[12], buffer); // everything is written into int
+      if(sendall(fd, intermediary, &bytes_sent) != 0){
+        unix_error("couldnt send the message");
+      }
+    } else { // its a slash command
+      // i gotta look for what kind of slash command it is
+      // grab it out
+      int i;
+      char* cmd,
+      char* leftover; // a holder for the command and the leftover
+      // read the string from the server
+      bytes_recv = recv(sock_fd, buffer, MAXLEN, 0); // read input into buffer
+      if(bytes_recv <= 0){
+        unix_error("didnt receive correctly");
+      } // duplicate buffer
+      cmd = strdup(buffer);
+      // parse buffer
+      leftover = strtok(cmd, ' ');//parse on whitespace
+      for(i = 0;i<sizeof(commands);i++){
+        if(commads[i] == NULL){
+          // not legitimate command
+          unix_error("not legitimate command");
+          break;
+        }
+        if(strcmp(cmd, commands[i]) == 0){
+          switch(i){ // case on the index of the slash command.
+            // this is gonna be a big ass switch statement
+            // certain commands are done differently
+            // miuki did a really smart way, with a helper function w
+            // where certain possible things could eb set to null
+            case 0: // /tell > TELL <name> <message>
+            case 1: // /createp > CREATEP <name> <password>
+            case 2: // /creater > CREATER <name>
+            case 3: // /kick > KICK  <name>
+            case 4: // /bye > BYE <noargs>
+            case 5: // /leave > LEAVE <noargs>
+            case 6: // /join > JOIN <id>
+            case 7: // /listrooms > LISTR <noargs>
+            case 8: // /listusers > LISTU <noargs>
+            case 9: // /joinp > JOINP <id> <password>
+              //append the the verb to the leftover
+              intermediary = malloc(MAXLEN);
+              snprintf(intermediary, MAXLEN, "%s %s%s", verbs[i], leftover, cr);
+              if(sendall(sock_fd, buffer, &bytes_sent) != 0){
+                unix_error("");
+              }
+              break;
+            case 10: // /help <doesnt go to server>
 
-  while(){
+              break;
+            default: // how the fuck
+            // should't neeed to break at default
+
+          }
+        }
+      }
+
+    }
+
+  }
+  if(FD_ISSET(sock_fd, &readfds)){ // the server is sending us information
 
   }
 
+
+}
+
+void reversestr(const char* src, char* dest){ //dest is unmalloced
+  int i = 0;
+  int lastpos = strlen(src);
+  int currentpos = lastpos;
+  dest = malloc(lastpos);
+  char currentchar;
+
+  for(i = 0;i<lastpos; i++){
+    currentchar = src[i];
+    dest[currentpos] = currentchar;
+    currentpos--;
+  }
+  // now dest has been mutated
+  return;
 
 }
 
@@ -56,11 +170,11 @@ void unix_error(char *msg){
 */
 int open_clientfd(char* hostname, char* port){ // this function opens a client file descriptor
   int clientfd;
+  // pass in listp and p, because im gonna need to reference them in the main
   struct addrinfo hints, *listp, *p;
 
   // get a list of potential server addresses
-
-  memset(&hints, 0, sizeof(struct, addrinfo)); // zero it out
+  memset(&hints, 0, sizeof(struct addrinfo)); // zero it out
   hints.ai_socktype = SOCK_STREAM; // open a connection
   hints.ai_flags = AI_NUMERICSERV; // use a numeric port arg
   hints.ai_flags |= AI_ADDRCONFIG; // recommended for connections
@@ -72,6 +186,7 @@ int open_clientfd(char* hostname, char* port){ // this function opens a client f
     if((clientfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0){
       continue; // socket failed, try again
     }
+    // i ahve to use htons at a certain point on both ip and port
     // else it's not, connect to the server
     if(connect(clientfd, p->ai_addr, p->ai_addrlen) != -1){
       break; // success
@@ -81,7 +196,7 @@ int open_clientfd(char* hostname, char* port){ // this function opens a client f
 
   //clean up
   freeaddrinfo(listp);
-  if(!p){
+  if(!p){ // not p? does p still exist at this point?
     return -1;
   } else {
     return clientfd;
@@ -95,6 +210,117 @@ int Open_clientfd(char* hostname, char* port){
   if((result = open_clientfd(hostname, port)) < 0){
     unix_error("unable establish connection");
   }
+  return result;
+}
+
+int sendall(int fd, char* buf, int* len){
+  // send all returns 0 if successful
+  // returns -1 if not
+  int total = 0;
+  int bytesleft = *len;
+  int n;
+
+  while(total < *len){
+      n = send(fd, buf+total, bytesleft, 0);
+      if(n == -1)
+        break;
+      total += n;
+      bytesleft -= n;
+  }
+  *len = total; // the bytes actually sent will be recorded here
+
+  if(n == -1){
+    return -1;
+  } else {
+    return 0;
+  }
+}
+/* this will handle aloha
+*
+*/
+int handshake(int fd){
+  // will return 0 if successful
+  //elseewise -1
+  char* ack;
+  char recvbuf[MAXLEN];
+  char buffer[MAXLEN];
+  char* temp;
+  // in the client the thing is non blocking, so set it to non blocking
+  int bytes_sent;
+  bytes_sent = strlen(verbs[10]);
+  int bytes_recv;
+  // now i have to remember numbers instead of commands themselves
+  // aloha is verb 10, iam is verb 11, hi is verb 14
+  reversestr(verbs[10], ack);
+  ack = combineStrings(ack, cr); // add on carraige returns
+  // bytes sent gets changed by sendall
+  if(sendall(fd, verbs[10], &bytes_sent)!= 0){
+    // failure to send
+    unix_error("failure to send");
+    return -1;
+  } // else it gets here
+  // now we have to wait for an acknowledgement
+  // int recv(int sock_fd, void *buf, int len, int flags)
+  bytes_recv = recv(fd, recvbuf, bytes_sent, 0); // aloha backwards is the same length as aloha
+  if(bytes_recv <= 0){
+    // failure to recieve
+    unix_error("failure to recieve");
+    return -1;
+    //otherwise, we must have recieved some nonzero number of bytes
+  }
+  // check to see if the recieved bytes are an accurate ack
+  if(strcmp(recvbuf, ack) != 0){
+    unix_error("not correct ack");
+    return -1;
+  }
+  memset(recvbuf, 0, sizeof(recvbuf)); // clear the recieve buffer
+  // then get the Username from the user and send it over to the server
+  printf("please enter your username:\n");
+  //char *fgets(char *restrict s, int n, FILE *restrict stream);
+  fgets(buffer, MAXLEN, STDIN_FILENO); // read the shit from stdin
+  // buffer now has the username, send message IAM <username>
+  temp = malloc(MAXLEN); // extra 3 just in case
+  //snprintf(writestring, size, formatstring, varargs)
+  snprintf(temp, MAXLEN, "%s %s%s", verbs[11], buffer, cr); // snprintf concats using printf
+  if(sendall(fd, buffer, &bytes_sent) != 0){
+    unix_error("couldnt send");
+    return -1;
+  }
+  // now i gotta wait for the recieve
+  bytes_recv = recv(fd, recvbuf, bytes_sent, 0);
+  if(bytes_recv <= 0){
+    unix_error("failed to receive");
+    return -1;
+  }
+  // print the return message out for the user
+  printf("%s\n", recvbuf);
+  return 0;
+}
+
+int unblock(int fd){ // makes socket non blocking
+  int flags;
+  int n;
+  flags = fcntl(fd, F_GETFL, 0); // get the flags
+  if(flags == -1){
+    unix_error("fcntl error");
+    return -1;
+  }
+  flags |= O_NONBLOCK;
+  n = fcntl(fd, F_SETFL, flags); // set the flags
+  if(n == -1){
+    unix_error("fcntl error");
+    return -1;
+  }
+  return 0;
+}
+
+char* combineStrings(char* prefix, char* suffix){
+  // this mallocs sace as well as putting two strings together
+  //strcat adds a null, so remeber that
+  char* result;
+  result = malloc(strlen(prefix) + strlen(suffix) + 1);
+  strcpy(result, prefix); // copy prefix over to result
+  strcat(result, suffix); // append on the suffix
   return result;
 }
 
