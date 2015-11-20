@@ -19,22 +19,18 @@
 
 	#define MAXMSG 1001
 	#define MAXNAME 1028
+	// flags and variables for arguments created at compile time
 	int port = 0, eflag = 0, hflag = 0;
-	char *motd;
-
-	/*typedef struct {
-		int maxfd;
-		fd_set read_set;
-		fd_set ready_set;
-		int nready;
-		int maxi;
-		int clientfd[2048];
-	} pool;
+	// message of the day, open client > server, open server > client, open accept
+	char *motd, *opencs = "ALOHA! \r\n", *opensc = "!AHOLA \r\n", *opena = "IAM", *sendall = "MSG", *bye = "BYE \r\n", *echoall = "ECHO";
+	char *stderror = "ERR 100 INTERNAL SERVER ERROR \r\n";
+	char *clienthead = NULL;
 
 	typedef struct client { // structure to hold client information
 		char username[MAXNAME];
 		char password[MAXNAME];
 		int fd;
-	};*/
+		int *prev, *next;
+	};
 
 #endif
