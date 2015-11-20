@@ -11,6 +11,7 @@
   #include <netdb.h>
   #include <string.h>
   #include <arpa/inet.h>
+  #include <fcntl.h>
 
   #define MAXLEN 1001
 
@@ -21,8 +22,18 @@
   #endif
 
   void unix_error(char *msg); // prints unix error
+  void reversestr(const char* src, char* dest); // reverses the strings, mallocs space and places in dest
+  int Close(int fd); // wrapper over close
+  int open_clientfd(char* hostname, char* port); // uses addrinfo, traverses it, and connects to the server
+  int Open_clientfd(char* hostname, char* port); // wrapper around Open_clientfd
+  int sendall(int fd, char* buf, int* len); //makes sure a certain number of bytes are sent out
+  int handshake(int fd); //initial aloha as well as identification of the user
+  // TODO in handshake-- recieve the correct kind of errors
+  int unblock(int fd); // sets a file descriptor to non blocking
+  char* combineStrings(char prefix, char* suffix); // this combines two strings by mallocing space and returns result
+  void print_help(); // prints the help menu, for how the client is called
 
-  char* cr = "/r/n";
+  char* cr = "\r\n";
 
    char** commands{
     "/tell\0", // TELL 0

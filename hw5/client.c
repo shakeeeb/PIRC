@@ -14,19 +14,25 @@ int main (int argc, char** argv){
   char* intermediary;
   int sock_fd = 0;
   int bytes_sent = 0;
-  int j = 0; // location is argv changes based on (lack) of a help menu
+  int execution_done = 0;
+  int bytes_recv = 0;
+  //int j = 0; // location is argv changes based on (lack) of a help menu
   int running = 0;
   fd_set readfds;
-  if(argc < 4){
+  if(strcmp(argv[1], "-h")){ // -h flag
+    print_help();
+    exit(0);
+  }
+  if(argc < 3){
     unix_error("not enough arguments");
     exit(1);
   }
-  if(strcmp(argv[1], "-h")){ // -h flag
-    j++;
-  }
+  // 0 name
+  // 1 IP in dotted decimal notation
+  // 2 Port number-- needs to be atoi
 
-  host = argv[j + 2]; // server ip
-  port = argv[j + 3]; // server port
+  host = argv[2]; // server ip
+  port = argv[3]; // server port
 
   sock_fd = Open_clientfd(host, port); // now i have an open socket file descriptor
   // this should also return the addrinfo somehow, so i have a handle to it here.
@@ -52,7 +58,7 @@ int main (int argc, char** argv){
   //becuase it waits for input to finish
   while(running == 0){
     if(select(sock_fd+1, &readfds, NULL, NULL, NULL) == -1)
-    unix_error("seect error");
+    unix_error("select error");
     exit(4);
   }
   if(FD_ISSET(STDIN_FILENO, &readfds)){ // the user is sending us information
@@ -71,7 +77,7 @@ int main (int argc, char** argv){
       // i gotta look for what kind of slash command it is
       // grab it out
       int i;
-      char* cmd,
+      char* cmd;
       char* leftover; // a holder for the command and the leftover
       // read the string from the server
       bytes_recv = recv(sock_fd, buffer, MAXLEN, 0); // read input into buffer
@@ -80,7 +86,7 @@ int main (int argc, char** argv){
       } // duplicate buffer
       cmd = strdup(buffer);
       // parse buffer
-      leftover = strtok(cmd, ' ');//parse on whitespace
+      leftover = strtok(cmd, " ");//parse on whitespace
       for(i = 0;i<sizeof(commands);i++){
         if(commads[i] == NULL){
           // not legitimate command
@@ -96,7 +102,7 @@ int main (int argc, char** argv){
             case 0: // /tell > TELL <name> <message>
             case 1: // /createp > CREATEP <name> <password>
             case 2: // /creater > CREATER <name>
-            case 3: // /kick > KICK  <name>
+            case 3: // /kick > KICK <name>
             case 4: // /bye > BYE <noargs>
             case 5: // /leave > LEAVE <noargs>
             case 6: // /join > JOIN <id>
@@ -107,23 +113,31 @@ int main (int argc, char** argv){
               intermediary = malloc(MAXLEN);
               snprintf(intermediary, MAXLEN, "%s %s%s", verbs[i], leftover, cr);
               if(sendall(sock_fd, buffer, &bytes_sent) != 0){
-                unix_error("");
+                unix_error("unable to send all bytes");
               }
+              execution_done = 1;
               break;
             case 10: // /help <doesnt go to server>
-
+              print_help();
+              execution_done = 1;
               break;
             default: // how the fuck
+              unix_error("hit default on switch statment");
             // should't neeed to break at default
-
-          }
+          } // end of switch
+        } // end of if statement
+        if(execution_done==1){
+          // execution is done
+          break; // break the for loop
         }
-      }
-
-    }
-
-  }
+      } // end of for loop
+    } // end of else statement, for else it's a slash command
+  } // end of if isset, which is the selection
+  // so this is the end of teh case where we recieve input from the user //
   if(FD_ISSET(sock_fd, &readfds)){ // the server is sending us information
+    //is the server sends us information its either an acknoweldgement or
+    // some sort fo command-- i have to look through the verbs and find
+
 
   }
 
@@ -330,4 +344,21 @@ void print_help(){
   printf("NAME \t\t Username to display when chatting.\n");
   printf("SERVER_IP \t IP address of the server to connect to.\n");
   printf("SERVER_PORT \t Port to connect to.\n");
+  exit(0); // returns exit success
+}
+
+void list_commands(){
+  // prints out a list of commands for the client
+  printf("/command\t\tVERB <argument1> <argument2> -- explanation of what the command does\n");
+  printf("/tell\t\tTELL <name> <message> -- tells another user a private message\n");
+  printf("/createp\t\tCREATEP <username> <password> -- creates a new private user\n");
+  printf("/creater\t\tCREATER <name> -- creates and names a new chatroom\n");
+  printf("/kick\t\tKICK <username> -- kicks a user out of a chatroom into a private\n");
+  printf("/quit\t\tBYE <noargs> -- logs a user out of the chat server\n");
+  printf("/leave\t\tLEAVE <noargs> -- removes the user from the chatroom\n");
+  printf("/join\t\tJOIN <id> -- places the user into a chatroom\n");
+  printf("/listrooms\t\tLISTR <noargs>-- lists the chatrooms currently available\n");
+  printf("/listusers\t\tLISTU <noargs>-- lists the users currently in the chatroom\n");
+  printf("/joinp\t\tJOINP <id> <password>-- joins a user to a private chatroom\n");
+  printf("/help\t\t <noverb> <noargs>-- prints  this help menu\n");
 }
