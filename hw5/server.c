@@ -151,8 +151,22 @@ void* login_thread(void *fd) {
     // if count is one check for the username
     if (count == 1) {
       if (check_username(token) == 0) {
-        // create new client struct to add client to the link list
+        // create struct for the new client
         client newclient = malloc(client);
+        strcpy(newclient.username, token);
+        newclient.fd = fd;
+
+        // add the new client to the linked list
+        if (clienthead == NULL) {
+          clienthead = &newclient;
+          newclient.prev = NULL;
+          newclient.next = NULL;
+        } else {
+          newclient.next = *clienthead;
+          newclient.prev = NULL;
+          clienthead->prev = &newclient;
+          clienthead = &newclient;
+        }
 
         // send greeting to the client
         char *greeting = "HI " + token;
@@ -200,16 +214,16 @@ int check_username(token) {
   if (ptr == NULL) {
     return 0;
   } else { // check to see if the username is present in the linked list
-    while(ptr.next != NULL) {
+    while(ptr->next != NULL) {
       // if it's present then return 1
-      if ((strcmp(token, ptr.username)) == 0) {
+      if ((strcmp(token, ptr->username)) == 0) {
         return 1;
       } else { // else advance the pointer
-        ptr = ptr.next;
+        ptr = ptr->next;
       }
     }
     // finally compare the last username in the list
-    if ((strcmp(token, ptr.username)) == 0) {
+    if ((strcmp(token, ptr->username)) == 0) {
       return 1;
     }
     // if nothing matches return 0
