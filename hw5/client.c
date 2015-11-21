@@ -163,7 +163,7 @@ int main (int argc, char** argv){
 
   } // end of if im getting things from the server
 
-
+  return 0;
 }
 
 void reversestr(const char* src, char* dest){ //dest is unmalloced
