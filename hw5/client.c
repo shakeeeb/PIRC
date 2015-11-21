@@ -353,12 +353,12 @@ void list_commands(){
   printf("/tell\t\tTELL <name> <message> -- tells another user a private message\n");
   printf("/createp\t\tCREATEP <username> <password> -- creates a new private user\n");
   printf("/creater\t\tCREATER <name> -- creates and names a new chatroom\n");
-  printf("/kick\t\tKICK <username> -- kicks a user out of a chatroom into a private\n");
+  printf("/kick\t\tKICK <username> -- kicks a user out of a chatroom\n");
   printf("/quit\t\tBYE <noargs> -- logs a user out of the chat server\n");
   printf("/leave\t\tLEAVE <noargs> -- removes the user from the chatroom\n");
   printf("/join\t\tJOIN <id> -- places the user into a chatroom\n");
   printf("/listrooms\t\tLISTR <noargs>-- lists the chatrooms currently available\n");
   printf("/listusers\t\tLISTU <noargs>-- lists the users currently in the chatroom\n");
   printf("/joinp\t\tJOINP <id> <password>-- joins a user to a private chatroom\n");
-  printf("/help\t\t <noverb> <noargs>-- prints  this help menu\n");
+  printf("/help\t\t <noverb> <noargs>-- prints this help menu\n");
 }

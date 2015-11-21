@@ -6,7 +6,8 @@
 int main (int argc, char ** argv) {
   /* Check number of arguments */
   if (argc < 3) { // check if there are enough arguments
-  	fprintf(stderr, "usage: %s <port>\n", argv[0]); // if not print to stderr
+  	fprintf(stderr, "Error: Too few args\n"); // if not print to stderr
+    help_menu();
   	exit(EXIT_FAILURE); // exit failure
   }
 
@@ -20,11 +21,7 @@ int main (int argc, char ** argv) {
       case 'h': // help flag
         hflag++;
         // print the help menu
-        printf("./server [-he] PORT_NUMBER MOTD\n"
-        	"-e\t\tEcho messages received on the server's stdout.\n"
-        	"-h\t\tDisplay the help menu & returns EXIT_SUCCESS\n"
-        	"PORT_NUMBER\t\tPort number to listen on.\n"
-        	"MOTD\t\tMessage to display on the client when they connect.\n");
+        help_menu();
         exit(EXIT_SUCCESS); // exit success
         break;
       default: // default do nothing
@@ -42,7 +39,8 @@ int main (int argc, char ** argv) {
   }
 
   /* Print port number */
-  printf("Currently listening on port %d.", port);
+  fprintf(stdout, "Currently listening on port %d.", port);
+  fflush(stdout);
 
   /* Begin listening for clients */
   struct epoll_event ev, events[10];
@@ -111,26 +109,29 @@ int open_listenfd(int port) {
 /* Thread for logging in clients */
 void* login_thread(void *fd) {
 	int pfd = *((int *)fd);
-  char *whitespace = " \n\r\t", buffer[MAXMSG];
-  struct client = malloc(sizeof(client));
-  char *bptr = &buffer[];
-  int bytes, count = 0;
+  char /**whitespace = " \n\r\t",*/ *buffer = malloc(MAXMSG);
+  struct client *newclient;
+  char *bptr = buffer;
+  int bytes, count = 0, n;
   char *token;
 	pthread_t eid;
 
-  clear_buf(buffer[], MAXMSG);
+  clear_buf(buffer, MAXMSG);
   // FIRST connect to the server, so there should be an initial "ALOHA!", "!AHOLA", and "IAM <username>"
   if ((bytes = recv(pfd, buffer, MAXMSG, 0)) != 0) {
     if (strcmp(buffer, opencs) == 0) {
-      send(fd, opensc, 9, 0);
+      n = strlen(opensc);
+      sendall(pfd, opensc, &n);
     } else {
-      send(fd, "ERR 00 SORRY \r\n")
-      send(fd, bye, strlen(bye), 0);
+      n = 15;
+      sendall(pfd, "ERR 00 SORRY \r\n", &n);
+      n = strlen(bye);
+      sendall(pfd, bye, &n);
       return NULL;
     }
   }
   // SECOND take the username and check to see if it's already in use
-  clear_buf(buffer[], MAXMSG);
+  clear_buf(buffer, MAXMSG);
   // get the information from the client and start tokenizing on space
   if ((bytes = recv(pfd, buffer, MAXMSG, 0)) != 0) {
     token = strtok(bptr, " ");
@@ -145,43 +146,53 @@ void* login_thread(void *fd) {
     // if not found, standard error
     } else {
       // something went wrong, send the standard error
-      send(pfd, stderror, strlen(stderror), 0);
+      n = strlen(stderror);
+      sendall(pfd, stderror, &n);
       break;
     }
     // if count is one check for the username
     if (count == 1) {
       if (check_username(token) == 0) {
         // create struct for the new client
-        client newclient = malloc(client);
-        strcpy(newclient.username, token);
-        newclient.fd = fd;
+        newclient = malloc(sizeof(struct client));
+        strcpy(newclient->username, token);
+        newclient->fd = pfd;
 
         // add the new client to the linked list
         if (clienthead == NULL) {
-          clienthead = &newclient;
-          newclient.prev = NULL;
-          newclient.next = NULL;
+          clienthead = newclient;
+          newclient->prev = NULL;
+          newclient->next = NULL;
         } else {
-          newclient.next = *clienthead;
-          newclient.prev = NULL;
-          clienthead->prev = &newclient;
-          clienthead = &newclient;
+          newclient->next = clienthead;
+          newclient->prev = NULL;
+          clienthead->prev = newclient;
+          clienthead = newclient;
         }
 
         // send greeting to the client
-        char *greeting = "HI " + token;
-        send(pfd, greeting, strlen(greeting), 0);
-        char *sendmotd = "ECHO server " + motd;
-        send(pfd, sendmotd, strlen(sendmotd), 0);
+        char *greeting = "HI ";
+        strcat(greeting, token);
+        n = strlen(greeting);
+        sendall(pfd, greeting, &n);
+        char *sendmotd = "ECHO server ";
+        strcat(sendmotd, motd);
+        n = strlen(sendmotd);
+        sendall(pfd, sendmotd, &n);
       } else {
         // the username is taken, reject connection with the client
-        char *reject = "ERR 00 SORRY " + token + " \r\n";
-        send(pfd, reject, strlen(reject), 0);
-        send(pfd, bye, strlen(bye), 0);
+        char *reject = "ERR 00 SORRY ";
+        strcat(reject, token);
+        strcat(reject, " \r\n");
+        n = strlen(reject);
+        sendall(pfd, reject, &n);
+        n = strlen(bye);
+        sendall(pfd, bye, &n);
       }
     } else {
       // something went wrong, send the standard error
-      send(pfd, stderror, strlen(stderror), 0);
+      n = strlen(stderror);
+      sendall(pfd, stderror, &n);
       break;
     }
     // increment count
@@ -202,14 +213,17 @@ void* login_thread(void *fd) {
 		// do nothing?
 	}
   // uhhh... isn't this self explanitory?
+  // kill this thread
+  free(buffer);
+  pthread_exit(NULL); // exit the login thread as it is done logging in the client
 	return NULL;
 }
 
 /* Check to make sure the username isn't already used */
-int check_username(token) {
+int check_username(char *token) {
   // if username is found return a 1
   // if username is not found return 0
-  char *ptr = clienthead;
+  struct client *ptr = clienthead;
   // if the head is null indicate the username is not used
   if (ptr == NULL) {
     return 0;
@@ -234,6 +248,7 @@ int check_username(token) {
 /* Function for starting the echo thread */
 void* echo_thread(void *n) {
 	// echo thread
+  return NULL;
 }
 
 /* This function clears any buffer */
@@ -242,4 +257,35 @@ void clear_buf(char buffer[], int size) {
   while (count < size) {
     buffer[count] = '\0';
   }
+}
+
+int sendall(int fd, char* buf, int* len) {
+  // send all returns 0 if successful
+  // returns -1 if not
+  int total = 0;
+  int bytesleft = *len;
+  int n;
+
+  while(total < *len){
+      n = send(fd, buf+total, bytesleft, 0);
+      if(n == -1)
+        break;
+      total += n;
+      bytesleft -= n;
+  }
+  *len = total; // the bytes actually sent will be recorded here
+
+  if(n == -1){
+    return -1;
+  } else {
+    return 0;
+  }
+}
+
+void help_menu() { // prints the help menu, go figure :P
+  printf("./server [-he] PORT_NUMBER MOTD\n"
+          "-e\t\tEcho messages received on the server's stdout.\n"
+          "-h\t\tDisplay the help menu & returns EXIT_SUCCESS\n"
+          "PORT_NUMBER\tPort number to listen on.\n"
+          "MOTD\t\tMessage to display on the client when they connect.\n");
 }
