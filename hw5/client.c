@@ -16,6 +16,7 @@ int main (int argc, char** argv){
   int bytes_sent = 0;
   int execution_done = 0;
   int bytes_recv = 0;
+  bytes_recv = bytes_recv;
   //int j = 0; // location is argv changes based on (lack) of a help menu
   int running = 0;
   fd_set readfds;
@@ -31,8 +32,8 @@ int main (int argc, char** argv){
   // 1 IP in dotted decimal notation
   // 2 Port number-- needs to be atoi
 
-  host = argv[2]; // server ip
-  port = argv[3]; // server port
+  host = argv[1]; // server ip
+  port = argv[2]; // server port
 
   sock_fd = Open_clientfd(host, port); // now i have an open socket file descriptor
   // this should also return the addrinfo somehow, so i have a handle to it here.
@@ -54,6 +55,10 @@ int main (int argc, char** argv){
   FD_ZERO(&readfds); // zeroes it out
   FD_SET(STDIN_FILENO, &readfds); //set stuff
   FD_SET(sock_fd, &readfds); // sets more stuff
+
+  int i;
+  char* cmd;
+  char* leftover;
   // unblock(sock_fd); honestly, why would be need to not block? doesnt blocking help,
   //becuase it waits for input to finish
   while(running == 0){
@@ -63,6 +68,7 @@ int main (int argc, char** argv){
   }
   if(FD_ISSET(STDIN_FILENO, &readfds)){ // the user is sending us information
     // fgets(buffer, maxlen, stream)
+    memset(buffer, 0, MAXLEN); // zero out the buffer
     fgets(buffer, MAXLEN, STDIN_FILENO); //get the command from the user
     //check if it's a slash command, otherwise it's just a regular message
     char c = buffer[0]; //the first character of the buffer needs to be a /
@@ -70,25 +76,18 @@ int main (int argc, char** argv){
       // append msg and send message msg is 12
       intermediary = malloc(MAXLEN+24);
       snprintf(intermediary, MAXLEN, "%s %s", verbs[12], buffer); // everything is written into int
-      if(sendall(fd, intermediary, &bytes_sent) != 0){
+      if(sendall(sock_fd, intermediary, &bytes_sent) != 0){ // its supposed to be zero
         unix_error("couldnt send the message");
       }
     } else { // its a slash command
       // i gotta look for what kind of slash command it is
       // grab it out
-      int i;
-      char* cmd;
-      char* leftover; // a holder for the command and the leftover
-      // read the string from the server
-      bytes_recv = recv(sock_fd, buffer, MAXLEN, 0); // read input into buffer
-      if(bytes_recv <= 0){
-        unix_error("didnt receive correctly");
-      } // duplicate buffer
+      // no no this is shit from teh user that i already have
       cmd = strdup(buffer);
       // parse buffer
       leftover = strtok(cmd, " ");//parse on whitespace
       for(i = 0;i<sizeof(commands);i++){
-        if(commads[i] == NULL){
+        if(commands[i] == NULL){
           // not legitimate command
           unix_error("not legitimate command");
           break;
@@ -135,11 +134,34 @@ int main (int argc, char** argv){
   } // end of if isset, which is the selection
   // so this is the end of teh case where we recieve input from the user //
   if(FD_ISSET(sock_fd, &readfds)){ // the server is sending us information
-    //is the server sends us information its either an acknoweldgement or
-    // some sort fo command-- i have to look through the verbs and find
+    //is the server sends us information its either an acknoweldgement
+    // a message to be echoed , or some sort of commmand, or some sort of error
+    recv_all(sock_fd, buffer); // receive all from the server
+    //after recieving all, parse out the command, because it has to be some sort of command
+    // these are the variables you have: buffer(the string from serv),
+    // int bytes sent int bytes recv int execution done, char* intermediary
+    leftover = leftover;
+    cmd = strdup(buffer);
+    leftover = strtok(cmd, " ");
+    for(i=0;i<sizeof(verbs);i++){
+      //okay
+      if(verbs[i] == NULL){
+        printf("not a supported command");
+        break;
+      }
+      if(strcmp(verbs[i], cmd) == 0){
+        switch(i){ // switch on the index
+          //WAIT! it could be an acknoweldgement --- ughhh
+          // so i guess i have to include all possible acks in the array that contains all verbs
+
+        }
+      }
+    } // end of for loop
 
 
-  }
+
+
+  } // end of if im getting things from the server
 
 
 }
@@ -227,6 +249,20 @@ int Open_clientfd(char* hostname, char* port){
   return result;
 }
 
+int recv_all(int fd, char* buf){
+  // the buffer should already be malloced or just be a static array
+  // assume buf is currently empty, or ust make it empty here
+  memset(buf, 0, MAXLEN); // cleans all of the buffer
+  int result = 0; // result is the number of bytes read out
+  char intermediary[MAXLEN];
+  while((result += recv(fd, intermediary, MAXLEN, 0)) != 0){ // while it hasnt recieved zero OR i could change zero to a -1
+    // append the recieved stuff into buf
+    buf = strcat(buf, intermediary); //so everything slowly adds on into the buffer
+  }
+  // this mutates buffer in place
+  return result;
+}
+
 int sendall(int fd, char* buf, int* len){
   // send all returns 0 if successful
   // returns -1 if not
@@ -255,7 +291,7 @@ int sendall(int fd, char* buf, int* len){
 int handshake(int fd){
   // will return 0 if successful
   //elseewise -1
-  char* ack;
+  char* ack = 0;
   char recvbuf[MAXLEN];
   char buffer[MAXLEN];
   char* temp;
@@ -275,7 +311,7 @@ int handshake(int fd){
   } // else it gets here
   // now we have to wait for an acknowledgement
   // int recv(int sock_fd, void *buf, int len, int flags)
-  bytes_recv = recv(fd, recvbuf, bytes_sent, 0); // aloha backwards is the same length as aloha
+  bytes_recv = recv_all(fd, recvbuf); // aloha backwards is the same length as aloha
   if(bytes_recv <= 0){
     // failure to recieve
     unix_error("failure to recieve");
@@ -293,21 +329,26 @@ int handshake(int fd){
   //char *fgets(char *restrict s, int n, FILE *restrict stream);
   fgets(buffer, MAXLEN, STDIN_FILENO); // read the shit from stdin
   // buffer now has the username, send message IAM <username>
-  temp = malloc(MAXLEN); // extra 3 just in case
+  temp = malloc(MAXLEN);// extra 3 just in case
   //snprintf(writestring, size, formatstring, varargs)
   snprintf(temp, MAXLEN, "%s %s%s", verbs[11], buffer, cr); // snprintf concats using printf
   if(sendall(fd, buffer, &bytes_sent) != 0){
-    unix_error("couldnt send");
+    unix_error("couldn't send");
     return -1;
   }
+  free(temp);
   // now i gotta wait for the recieve
-  bytes_recv = recv(fd, recvbuf, bytes_sent, 0);
+  bytes_recv = recv_all(fd, recvbuf);
   if(bytes_recv <= 0){
     unix_error("failed to receive");
     return -1;
   }
   // print the return message out for the user
-  printf("%s\n", recvbuf);
+  printf("%s\n", recvbuf); // this should be HI <username>
+  // then, i should wait for the MOTD
+  recv_all(fd, recvbuf);
+  temp = strtok(recvbuf, " "); // the first message is just ECHO motd
+  printf("%s", temp);
   return 0;
 }
 
@@ -353,7 +394,7 @@ void list_commands(){
   printf("/tell\t\tTELL <name> <message> -- tells another user a private message\n");
   printf("/createp\t\tCREATEP <username> <password> -- creates a new private user\n");
   printf("/creater\t\tCREATER <name> -- creates and names a new chatroom\n");
-  printf("/kick\t\tKICK <username> -- kicks a user out of a chatroom into a private\n");
+  printf("/kick\t\tKICK <username> -- kicks a user out of a chatroom \n");
   printf("/quit\t\tBYE <noargs> -- logs a user out of the chat server\n");
   printf("/leave\t\tLEAVE <noargs> -- removes the user from the chatroom\n");
   printf("/join\t\tJOIN <id> -- places the user into a chatroom\n");

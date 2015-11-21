@@ -30,12 +30,13 @@
   int handshake(int fd); //initial aloha as well as identification of the user
   // TODO in handshake-- recieve the correct kind of errors
   int unblock(int fd); // sets a file descriptor to non blocking
-  char* combineStrings(char prefix, char* suffix); // this combines two strings by mallocing space and returns result
+  char* combineStrings(char* prefix, char* suffix); // this combines two strings by mallocing space and returns result
   void print_help(); // prints the help menu, for how the client is called
+  int recv_all(int fd, char* buf); // receive all receives everything
 
   char* cr = "\r\n";
 
-   char** commands{
+   char* commands[] = {
     "/tell\0", // TELL 0
     "/createp\0", //CREATEP 1
     "/creater\0", //CREATER 2
@@ -53,32 +54,40 @@
   // this is a two part array, honestly, i couldve just made an array of two tuples but fuck it
   // two arrays where one integer maps that maps to a command maps to its cooresponding verb
 
-   char** verbs{
-    "TELL\0", //0
-    "CREATEP\0", //1
-    "CREATER\0", // 2
-    "KICK\0", // 3
-    "BYE\0", // 4
-    "LEAVE\0", // 5
-    "JOIN\0", // 6
-    "LISTR\0",// 7
-    "LISTU\0", //8
-    "JOINP\0", // 9 this ends the list of verbs that have commands
-    "ALOHA!\0",// 10
-    "IAM \0", // 11
-    "MSG \0", // 12
-    "ERR\0",// 13
-    "HI\0", // 14
-    "ECHO\0", // 15
-    "TELL\0", // 16
-    "ECHOP\0", // 17
-    "AUTH\0", // 18
-    "PASS\0", // 19
-    "IAMNEW\0", // 20
-    "HINEW\0", // 21
-    "NEWPASS\0", // 22
-    "KBYE\0", //23
-    NULL // double null terminated
+   char* verbs[] = {
+    "TELL\0", //0 LLET
+    "CREATEP\0", //1 PETAERC
+    "CREATER\0", // 2 RETAERC
+    "KICK\0", // 3 KCIK
+    "BYE\0", // 4 BYE
+    "LEAVE\0", // 5 EVAEL
+    "JOIN\0", // 6 NIOJ
+    "LISTR\0",// 7 RTSIL
+    "LISTU\0", //8 UTSIL
+    "JOINP\0", // 9 PNIOJ this ends the list of verbs that have commands
+    "ALOHA!\0",// 10 AHOLA! but i took care of that
+    "IAM \0", // 11 none
+    "MSG \0", // 12 none
+    "ERR\0",// 13 ERR
+    "HI\0", // 14 none
+    "ECHO\0", // 15 ECHO
+    "ECHOP\0", // 16 ECHOP
+    "AUTH\0", // 17 AUTH
+    "PASS\0", // 18 PASS
+    "IAMNEW\0", // 19
+    "HINEW\0", // 20
+    "NEWPASS\0", // 21
+    "KBYE\0", //22
+    "LLET\0", //23 tell ACK
+    "PETAERC\0", //24createp ack
+    "RETAERC\0", //25creater ack
+    "KCIK\0", //26kick ack
+    "EVAEL\0", //27leave ack
+    "NIOJ\0", //28 join ack
+    "RTSIL\0", //29 listr ack
+    "UTSIL\0", //30 listu ack
+    "PNIOJ\0", //31 joinp ack
+    NULL //32 double null terminated
   };
 
 #endif
