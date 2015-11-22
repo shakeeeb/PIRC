@@ -13,6 +13,12 @@
 	#include <netdb.h>
 	#include <errno.h>
 
+	#ifdef DEBUG // use this statement for print debugging statements
+		#define debug(fmt, ...) printf("\nDEBUG: %s\n\tFunction: %s\n\tLine #: %d\n\n", fmt, __FUNCTION__, __LINE__, ##__VA_ARGS__)
+	#else
+		#define debug(fmt, ...)
+	#endif
+
 	int open_listenfd(int port);
 	void *login_thread(void *pfd);
 	int check_username(char *token);
