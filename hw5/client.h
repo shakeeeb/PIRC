@@ -34,7 +34,7 @@
   void print_help(); // prints the help menu, for how the client is called
   int recv_all(int fd, char* buf); // receive all receives everything
 
-  char* cr = "\r\n";
+  char* cr = "\r\n\0";
 
    char* commands[] = {
     "/tell\0", // TELL 0

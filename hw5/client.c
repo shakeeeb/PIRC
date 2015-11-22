@@ -42,6 +42,7 @@ int main (int argc, char** argv){
   // teh question is, should i i/o multiplex before sending aloha?
   // or should i send aloha, and then i/o multiplex after establishing a connection
   // try the handshake, and this willr eturn 0 if successful
+  //unblock(sock_fd);
   if(handshake(sock_fd) != 0){
     // something happened and its up to me to find out who it was and why
     unix_error("handshake error");
@@ -60,7 +61,7 @@ int main (int argc, char** argv){
   int i;
   char* cmd;
   char* leftover;
-  // unblock(sock_fd); honestly, why would be need to not block? doesnt blocking help,
+  //unblock(sock_fd); //honestly, why would be need to not block? doesnt blocking help,
   //becuase it waits for input to finish
   while(running == 0){
     if(select(sock_fd+1, &readfds, NULL, NULL, NULL) == -1)
@@ -259,11 +260,13 @@ int recv_all(int fd, char* buf){
   // the buffer should already be malloced or just be a static array
   // assume buf is currently empty, or ust make it empty here
   memset(buf, 0, MAXLEN); // cleans all of the buffer
-  int result = 0; // result is the number of bytes read out
+  int result, n = 0; // result is the number of bytes read out
   char intermediary[MAXLEN];
-  while((result += recv(fd, intermediary, MAXLEN, 0)) != -1){ // while it hasnt recieved zero OR i could change zero to a -1
+  while((n = recv(fd, intermediary, MAXLEN, 0)) >= 0){ // while it hasnt recieved zero OR i could change zero to a -1
     // append the recieved stuff into buf
+    result += n;
     buf = strcat(buf, intermediary); //so everything slowly adds on into the buffer
+    memset(intermediary, 0, MAXLEN); //
   }
   // this mutates buffer in place
   return result;
@@ -300,6 +303,7 @@ int handshake(int fd){
   char* ack = 0;
   char recvbuf[MAXLEN];
   char buffer[MAXLEN];
+  //char sendbuf[MAXLEN];
   char* temp;
   // in the client the thing is non blocking, so set it to non blocking
   int bytes_sent;
@@ -310,7 +314,13 @@ int handshake(int fd){
   ack = reversestr(verbs[10]);
   ack = combineStrings(ack, cr); // add on carraige returns
   // bytes sent gets changed by sendall
-  if(sendall(fd, verbs[10], &bytes_sent)!= 0){
+  //snprintf(sendbuf, MAXLEN, "%s %s", verbs[10], cr);
+  //temp = combineStrings(verbs[10], " \0");
+  //temp = combineStrings(temp, cr);
+  temp = "ALOHA! \r\n\0";
+  bytes_sent = strlen(temp);
+  printf("%s", temp);
+  if(sendall(fd, temp, &bytes_sent)!= 0){
     // failure to send
     unix_error("failure to send");
     return -1;
@@ -320,6 +330,7 @@ int handshake(int fd){
   bytes_recv = recv_all(fd, recvbuf); // aloha backwards is the same length as aloha
   if(bytes_recv <= 0){
     // failure to recieve
+    printf("%s", recvbuf);
     unix_error("failure to recieve");
     return -1;
     //otherwise, we must have recieved some nonzero number of bytes
