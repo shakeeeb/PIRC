@@ -38,7 +38,7 @@ int main (int argc, char ** argv) {
   	motd = argv[3];
   }
 
-  debug("debug is working?!? THANK YOU KWAKU");
+  debug("debug is working?!?");
 
   /* Print port number */
   fprintf(stdout, "Currently listening on port %d.\n", port);
@@ -137,7 +137,6 @@ void* login_thread(void *fd) {
 	int pfd = *((int *)fd);
   char /**whitespace = " \n\r\t",*/ *buffer = malloc(MAXMSG);
   struct client *newclient;
-  char *bptr = buffer;
   int bytes, count = 0, n;
   char *token;
 	pthread_t eid;
@@ -146,6 +145,11 @@ void* login_thread(void *fd) {
   // FIRST connect to the server, so there should be an initial "ALOHA!", "!AHOLA", and "IAM <username>"
   if ((bytes = recv_all(pfd, buffer)) != 0) {
     debug(buffer);
+    char *bptr = buffer;
+    while (*bptr != '\0') {
+      printf("%d", *bptr);
+      bptr++;
+    } 65 76 79 72 65 33
     if (strcmp(buffer, opencs) == 0) {
       n = strlen(opensc);
       sendall(pfd, opensc, &n);
@@ -165,7 +169,7 @@ void* login_thread(void *fd) {
   //clear_buf(buffer, MAXMSG);
   // get the information from the client and start tokenizing on space
   if ((bytes = recv_all(pfd, buffer)) != 0) {
-    token = strtok(bptr, " ");
+    token = strtok(buffer, " ");
   }
   // while the token isn't null, find username. IAM on count zero and username on count one
   while(token != NULL) {
@@ -307,7 +311,7 @@ int sendall(int fd, char* buf, int* len) {
   int bytesleft = *len;
   int n;
 
-  while(total < *len){
+  while(total < *len) {
       n = send(fd, buf+total, bytesleft, 0);
       if(n == -1)
         break;
@@ -327,11 +331,13 @@ int recv_all(int fd, char* buf) {
   // the buffer should already be malloced or just be a static array
   // assume buf is currently empty, or ust make it empty here
   memset(buf, 0, MAXMSG); // cleans all of the buffer
-  int result = 0; // result is the number of bytes read out
+  int result = 0, n; // result is the number of bytes read out
   char intermediary[MAXMSG];
-  while((result += recv(fd, intermediary, MAXMSG, 0)) != 0){ // while it hasnt recieved zero OR i could change zero to a -1
+  while((n = recv(fd, intermediary, MAXMSG, 0)) >= 0){ // while it hasnt recieved zero OR i could change zero to a -1
     // append the recieved stuff into buf
+    result += n;
     buf = strcat(buf, intermediary); //so everything slowly adds on into the buffer
+    memset(intermediary, 0, MAXMSG);
   }
   // this mutates buffer in place
   return result;
