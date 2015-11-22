@@ -22,7 +22,7 @@
   #endif
 
   void unix_error(char *msg); // prints unix error
-  void reversestr(const char* src, char* dest); // reverses the strings, mallocs space and places in dest
+  char* reversestr(const char* src); // reverses the strings, mallocs space and places in dest
   int Close(int fd); // wrapper over close
   int open_clientfd(char* hostname, char* port); // uses addrinfo, traverses it, and connects to the server
   int Open_clientfd(char* hostname, char* port); // wrapper around Open_clientfd
