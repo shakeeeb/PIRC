@@ -38,8 +38,10 @@ int main (int argc, char ** argv) {
   	motd = argv[3];
   }
 
+  debug("debug is working?!?");
+
   /* Print port number */
-  fprintf(stdout, "Currently listening on port %d.", port);
+  fprintf(stdout, "Currently listening on port %d.\n", port);
   fflush(stdout);
 
   /* Begin listening for clients */
@@ -84,6 +86,7 @@ int main (int argc, char ** argv) {
 
 /* Open the listening file descriptor */
 int open_listenfd(int port) {
+  debug("opening listenfd");
 	// opens socket connection
 	int listen_fd;
 	struct sockaddr_in serveraddr;
@@ -108,6 +111,7 @@ int open_listenfd(int port) {
 
 /* Thread for logging in clients */
 void* login_thread(void *fd) {
+  debug("starting login thread");
 	int pfd = *((int *)fd);
   char /**whitespace = " \n\r\t",*/ *buffer = malloc(MAXMSG);
   struct client *newclient;
@@ -119,12 +123,15 @@ void* login_thread(void *fd) {
   clear_buf(buffer, MAXMSG);
   // FIRST connect to the server, so there should be an initial "ALOHA!", "!AHOLA", and "IAM <username>"
   if ((bytes = recv(pfd, buffer, MAXMSG, 0)) != 0) {
+    debug(buffer);
     if (strcmp(buffer, opencs) == 0) {
       n = strlen(opensc);
       sendall(pfd, opensc, &n);
+      debug(opensc);
     } else {
       n = 15;
       sendall(pfd, "ERR 00 SORRY \r\n", &n);
+      debug("ERR 00 SORRY \r\n");
       n = strlen(bye);
       sendall(pfd, bye, &n);
       return NULL;
@@ -148,6 +155,7 @@ void* login_thread(void *fd) {
       // something went wrong, send the standard error
       n = strlen(stderror);
       sendall(pfd, stderror, &n);
+      debug(stderror);
       break;
     }
     // if count is one check for the username
@@ -175,10 +183,12 @@ void* login_thread(void *fd) {
         strcat(greeting, token);
         n = strlen(greeting);
         sendall(pfd, greeting, &n);
+        debug(greeting);
         char *sendmotd = "ECHO server ";
         strcat(sendmotd, motd);
         n = strlen(sendmotd);
         sendall(pfd, sendmotd, &n);
+        debug(sendmotd);
       } else {
         // the username is taken, reject connection with the client
         char *reject = "ERR 00 SORRY ";
@@ -186,13 +196,16 @@ void* login_thread(void *fd) {
         strcat(reject, " \r\n");
         n = strlen(reject);
         sendall(pfd, reject, &n);
+        debug(reject);
         n = strlen(bye);
         sendall(pfd, bye, &n);
+        debug(bye);
       }
     } else {
       // something went wrong, send the standard error
       n = strlen(stderror);
       sendall(pfd, stderror, &n);
+      debug(stderror);
       break;
     }
     // increment count
@@ -225,6 +238,9 @@ int check_username(char *token) {
   // if username is not found return 0
   struct client *ptr = clienthead;
   // if the head is null indicate the username is not used
+  if ((strcmp(token, "server")) == 0) {
+    return 1;
+  }
   if (ptr == NULL) {
     return 0;
   } else { // check to see if the username is present in the linked list
