@@ -20,7 +20,8 @@ int main (int argc, char** argv){
   //int j = 0; // location is argv changes based on (lack) of a help menu
   int running = 0;
   fd_set readfds;
-  if(strcmp(argv[1], "-h")){ // -h flag
+
+  if(strcmp(argv[1], "-h") == 0){ // -h flag
     print_help();
     exit(0);
   }
@@ -143,20 +144,21 @@ int main (int argc, char** argv){
     leftover = leftover;
     cmd = strdup(buffer);
     leftover = strtok(cmd, " ");
-    for(i=0;i<sizeof(verbs);i++){
+    printf("%s", buffer);
+    /*for(i=0;i<sizeof(verbs);i++){ // iterate through the list of verbs
       //okay
       if(verbs[i] == NULL){
         printf("not a supported command");
         break;
       }
       if(strcmp(verbs[i], cmd) == 0){
-        switch(i){ // switch on the index
+        //switch(i){ // switch on the index
           //WAIT! it could be an acknoweldgement --- ughhh
           // so i guess i have to include all possible acks in the array that contains all verbs
 
-        }
+        //}
       }
-    } // end of for loop
+    } // end of for loop */
 
 
 
@@ -166,20 +168,24 @@ int main (int argc, char** argv){
   return 0;
 }
 
-void reversestr(const char* src, char* dest){ //dest is unmalloced
+char* reversestr(const char* src){ //dest is unmalloced
+  char* dest;
   int i = 0;
   int lastpos = strlen(src);
-  int currentpos = lastpos;
+  int currentpos = lastpos -1;
   dest = malloc(lastpos);
   char currentchar;
 
+  // i ahve to change this so i start from the beginning of dest and the end of src
+
   for(i = 0;i<lastpos; i++){
-    currentchar = src[i];
-    dest[currentpos] = currentchar;
+    currentchar = src[currentpos];
+    dest[i] = currentchar;
     currentpos--;
   }
+  dest[lastpos] = '\0';
   // now dest has been mutated
-  return;
+  return dest;
 
 }
 
@@ -255,7 +261,7 @@ int recv_all(int fd, char* buf){
   memset(buf, 0, MAXLEN); // cleans all of the buffer
   int result = 0; // result is the number of bytes read out
   char intermediary[MAXLEN];
-  while((result += recv(fd, intermediary, MAXLEN, 0)) != 0){ // while it hasnt recieved zero OR i could change zero to a -1
+  while((result += recv(fd, intermediary, MAXLEN, 0)) != -1){ // while it hasnt recieved zero OR i could change zero to a -1
     // append the recieved stuff into buf
     buf = strcat(buf, intermediary); //so everything slowly adds on into the buffer
   }
@@ -301,7 +307,7 @@ int handshake(int fd){
   int bytes_recv;
   // now i have to remember numbers instead of commands themselves
   // aloha is verb 10, iam is verb 11, hi is verb 14
-  reversestr(verbs[10], ack);
+  ack = reversestr(verbs[10]);
   ack = combineStrings(ack, cr); // add on carraige returns
   // bytes sent gets changed by sendall
   if(sendall(fd, verbs[10], &bytes_sent)!= 0){
