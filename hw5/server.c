@@ -38,7 +38,7 @@ int main (int argc, char ** argv) {
   	motd = argv[3];
   }
 
-  debug("debug is working?!?");
+  debug("debug is working?!? THANK YOU KWAKU");
 
   /* Print port number */
   fprintf(stdout, "Currently listening on port %d.\n", port);
@@ -73,12 +73,14 @@ int main (int argc, char ** argv) {
   			connfd = malloc(sizeof(int));
   			*connfd = accept(listen_fd, (struct sockaddr *)&clientaddr, &clientlen);
 
-        ev.events = EPOLLIN | EPOLLOUT; // set ability to read/write to fd
+        non_blocking_fd(*connfd);
+
+        ev.events = EPOLLIN | EPOLLET; // set ability to read/write to fd
         ev.data.fd = *connfd;
         epoll_ctl(epollfd, EPOLL_CTL_ADD, *connfd, &ev);
 
         // create thread to login this fd
-        pthread_create(&lid, NULL, login_thread, &connfd);
+        pthread_create(&lid, NULL, login_thread, connfd);
   		}
   	}
   }
@@ -93,6 +95,7 @@ int open_listenfd(int port) {
 
   // create the socket
 	listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+  fcntl(listen_fd, F_SETFL, O_NONBLOCK);
 	bzero(&serveraddr, sizeof(serveraddr));
 
   // assign everything
@@ -109,9 +112,28 @@ int open_listenfd(int port) {
 	return listen_fd;
 }
 
+int non_blocking_fd(int fd) {
+  int flag, e;
+
+  flag = fcntl(fd, F_GETFL, 0);
+  if (flag == -1) {
+    return -1;
+  }
+
+  flag |= O_NONBLOCK;
+  e = fcntl (fd, F_SETFL, flag);
+  if (e == -1) {
+    return -1;
+  }
+
+  return 0;
+}
+
 /* Thread for logging in clients */
 void* login_thread(void *fd) {
+  pthread_detach(pthread_self());
   debug("starting login thread");
+
 	int pfd = *((int *)fd);
   char /**whitespace = " \n\r\t",*/ *buffer = malloc(MAXMSG);
   struct client *newclient;
@@ -120,9 +142,9 @@ void* login_thread(void *fd) {
   char *token;
 	pthread_t eid;
 
-  clear_buf(buffer, MAXMSG);
+  //clear_buf(buffer, MAXMSG);
   // FIRST connect to the server, so there should be an initial "ALOHA!", "!AHOLA", and "IAM <username>"
-  if ((bytes = recv(pfd, buffer, MAXMSG, 0)) != 0) {
+  if ((bytes = recv_all(pfd, buffer)) != 0) {
     debug(buffer);
     if (strcmp(buffer, opencs) == 0) {
       n = strlen(opensc);
@@ -136,11 +158,13 @@ void* login_thread(void *fd) {
       sendall(pfd, bye, &n);
       return NULL;
     }
+  } else {
+    debug("We didn't get anything...");
   }
   // SECOND take the username and check to see if it's already in use
-  clear_buf(buffer, MAXMSG);
+  //clear_buf(buffer, MAXMSG);
   // get the information from the client and start tokenizing on space
-  if ((bytes = recv(pfd, buffer, MAXMSG, 0)) != 0) {
+  if ((bytes = recv_all(pfd, buffer)) != 0) {
     token = strtok(bptr, " ");
   }
   // while the token isn't null, find username. IAM on count zero and username on count one
@@ -272,6 +296,7 @@ void clear_buf(char buffer[], int size) {
   int count = 0;
   while (count < size) {
     buffer[count] = '\0';
+    count++;
   }
 }
 
@@ -296,6 +321,20 @@ int sendall(int fd, char* buf, int* len) {
   } else {
     return 0;
   }
+}
+
+int recv_all(int fd, char* buf) {
+  // the buffer should already be malloced or just be a static array
+  // assume buf is currently empty, or ust make it empty here
+  memset(buf, 0, MAXMSG); // cleans all of the buffer
+  int result = 0; // result is the number of bytes read out
+  char intermediary[MAXMSG];
+  while((result += recv(fd, intermediary, MAXMSG, 0)) != 0){ // while it hasnt recieved zero OR i could change zero to a -1
+    // append the recieved stuff into buf
+    buf = strcat(buf, intermediary); //so everything slowly adds on into the buffer
+  }
+  // this mutates buffer in place
+  return result;
 }
 
 void help_menu() { // prints the help menu, go figure :P

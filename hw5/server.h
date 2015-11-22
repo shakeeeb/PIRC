@@ -12,6 +12,7 @@
 	#include <sys/types.h>
 	#include <netdb.h>
 	#include <errno.h>
+	#include <fcntl.h>
 
 	#ifdef DEBUG // use this statement for print debugging statements
 		#define debug(fmt, ...) printf("\nDEBUG: %s\n\tFunction: %s\n\tLine #: %d\n\n", fmt, __FUNCTION__, __LINE__, ##__VA_ARGS__)
@@ -20,11 +21,13 @@
 	#endif
 
 	int open_listenfd(int port);
+	int non_blocking_fd(int fd);
 	void *login_thread(void *pfd);
 	int check_username(char *token);
 	void* echo_thread(void *fd);
 	void clear_buf(char buffer[], int size);
 	int sendall(int fd, char* buf, int* len);
+	int recv_all(int fd, char* buf);
 	void help_menu();
 
 	#define MAXMSG 1001
