@@ -16,10 +16,12 @@ int main (int argc, char** argv){
   int bytes_sent = 0;
   int execution_done = 0;
   int bytes_recv = 0;
+  char* username;
   bytes_recv = bytes_recv;
   //int j = 0; // location is argv changes based on (lack) of a help menu
   int running = 0;
   fd_set readfds;
+  // never tokenize static strings
 
   if(strcmp(argv[1], "-h") == 0){ // -h flag
     print_help();
@@ -30,22 +32,29 @@ int main (int argc, char** argv){
     exit(1);
   }
   // 0 name
-  // 1 IP in dotted decimal notation
-  // 2 Port number-- needs to be atoi
-
-  host = argv[1]; // server ip
-  port = argv[2]; // server port
+  // 1 username
+  // 2 IP in dotted decimal notation
+  // 3 Port number-- no its okay right now
+  username = argv[1]; // username
+  host = argv[2]; // server ip
+  port = argv[3]; // server port
+  username = username;
 
   sock_fd = Open_clientfd(host, port); // now i have an open socket file descriptor
+  if(sock_fd == -1){
+    unix_error("the socket's returning negative one. this is a port cooldown issue");
+    exit(1);
+  }
   // this should also return the addrinfo somehow, so i have a handle to it here.
   // initiate login by sending aloha
   // teh question is, should i i/o multiplex before sending aloha?
   // or should i send aloha, and then i/o multiplex after establishing a connection
   // try the handshake, and this willr eturn 0 if successful
   //unblock(sock_fd);
-  if(handshake(sock_fd) != 0){
+  if(sendAloha(sock_fd) != 0){
     // something happened and its up to me to find out who it was and why
-    unix_error("handshake error");
+    unix_error("send aloha error");
+    exit(4);
     // lol jk youre fucked
   }
 
@@ -57,117 +66,151 @@ int main (int argc, char** argv){
   FD_ZERO(&readfds); // zeroes it out
   FD_SET(STDIN_FILENO, &readfds); //set stuff
   FD_SET(sock_fd, &readfds); // sets more stuff
-
   int i;
   char* cmd;
   char* leftover;
-  //unblock(sock_fd); //honestly, why would be need to not block? doesnt blocking help,
+  unblock(sock_fd); //honestly, why would be need to not block? doesnt blocking help,
   //becuase it waits for input to finish
   while(running == 0){
-    if(select(sock_fd+1, &readfds, NULL, NULL, NULL) == -1)
-    unix_error("select error");
-    exit(4);
-  }
-  if(FD_ISSET(STDIN_FILENO, &readfds)){ // the user is sending us information
-    // fgets(buffer, maxlen, stream)
-    memset(buffer, 0, MAXLEN); // zero out the buffer
-    fgets(buffer, MAXLEN, STDIN_FILENO); //get the command from the user
-    //check if it's a slash command, otherwise it's just a regular message
-    char c = buffer[0]; //the first character of the buffer needs to be a /
-    if(c != '/'){ // its a message
-      // append msg and send message msg is 12
-      intermediary = malloc(MAXLEN+24);
-      snprintf(intermediary, MAXLEN, "%s %s", verbs[12], buffer); // everything is written into int
-      if(sendall(sock_fd, intermediary, &bytes_sent) != 0){ // its supposed to be zero
-        unix_error("couldnt send the message");
-      }
-    } else { // its a slash command
-      // i gotta look for what kind of slash command it is
-      // grab it out
-      // no no this is shit from teh user that i already have
-      cmd = strdup(buffer);
-      // parse buffer
-      leftover = strtok(cmd, " ");//parse on whitespace
-      for(i = 0;i<sizeof(commands);i++){
-        if(commands[i] == NULL){
-          // not legitimate command
-          unix_error("not legitimate command");
+    if(select(sock_fd+1, &readfds, NULL, NULL, NULL) == -1){
+      unix_error("select error");
+      exit(4);
+    }
+    execution_done = 0;
+    //                          //
+    // IF READING FROM THE USER //
+    //                          //
+    if(FD_ISSET(STDIN_FILENO, &readfds)){ // the user is sending us information
+      // fgets(buffer, maxlen, stream)
+      memset(buffer, 0, MAXLEN); // zero out the buffer
+      fgets(buffer, MAXLEN, STDIN_FILENO); //get the command from the user
+      //check if it's a slash command, otherwise it's just a regular message
+      char c = buffer[0]; //the first character of the buffer needs to be a /
+      // IF ITS NOT A SLASH COMMAND
+      if(c != '/'){ // its a message
+        // append msg and send message msg is 12
+        intermediary = malloc(MAXLEN+24);
+          execution_done = 1;
+          snprintf(intermediary, MAXLEN, "%s %s", verbs[12], buffer); // everything is written into int
+          if(sendall(sock_fd, intermediary, &bytes_sent) != 0){ // its supposed to be zero
+            unix_error("couldnt send the message");
+          }
+        // end of if it's not a slash command
+      } else { // its a slash command
+        // i gotta look for what kind of slash command it is
+        // grab it out
+        leftover = strdup(buffer);
+        // parse buffer
+        cmd = strsep(&leftover, " ");//parse on whitespace
+        for(i = 0;i<sizeof(commands);i++){
+          if(commands[i] == NULL){
+            // not legitimate command
+            unix_error("not legitimate command");
+            break;
+          }
+          if(strcmp(cmd, commands[i]) == 0){
+            switch(i){ // case on the index of the slash command.
+              // this is gonna be a big ass switch statement
+              // certain commands are done differently
+              // miuki did a really smart way, with a helper function w
+              // where certain possible things could eb set to null
+              case 0: // /tell > TELL <name> <message>
+              case 1: // /createp > CREATEP <name> <password>
+              case 2: // /creater > CREATER <name>
+              case 3: // /kick > KICK <name>
+              case 4: // /bye > BYE <noargs>
+              case 5: // /leave > LEAVE <noargs>
+              case 6: // /join > JOIN <id>
+              case 7: // /listrooms > LISTR <noargs>
+              case 8: // /listusers > LISTU <noargs>
+              case 9: // /joinp > JOINP <id> <password>
+                //append the the verb to the leftover
+                intermediary = malloc(MAXLEN);
+                snprintf(intermediary, MAXLEN, "%s %s%s", verbs[i], leftover, cr);
+                if(sendall(sock_fd, buffer, &bytes_sent) != 0){
+                  unix_error("unable to send all bytes");
+                }
+                execution_done = 1;
+                break;
+              case 10: // /help <doesnt go to server>
+                print_help();
+                execution_done = 1;
+                break;
+              default: // how the fuck
+                unix_error("hit default on switch statment");
+              // should't neeed to break at default
+            } // end of switch
+          } // end of if statement
+          if(execution_done==1){
+            // execution is done
+            break; // break the for loop
+          }
+        } // end of for loop
+        execution_done = 0;
+      } // end of else statement, for else it's a slash command
+    } // end of if isset, which is the selection
+    // so this is the end of teh case where we recieve input from the user //
+    //                       //
+    // GET INPUT FROM SERVER //
+    //                       //
+    if(FD_ISSET(sock_fd, &readfds)){ // the server is sending us information
+      //is the server sends us information its either an acknoweldgement
+      // a message to be echoed , or some sort of commmand, or some sort of error
+      recv_all(sock_fd, buffer); // receive all from the server
+      //after recieving all, parse out the command, because it has to be some sort of command
+      // these are the variables you have: buffer(the string from serv),
+      // int bytes sent int bytes recv int execution done, char* intermediary
+      leftover = leftover;
+      leftover = strdup(buffer);
+      cmd = strsep(&leftover, " ");
+      // you can't handshake before iomultiplexing, unfortunately
+      // so i've gotta send the initial aloha, and then wait for ahola in the iomultiplexed client code
+      //printf("%s", buffer);
+      for(i=0;i<sizeof(verbs);i++){ // iterate through the list of verbs
+        //okay
+        if(verbs[i] == NULL){
+          printf("not a supported command");
           break;
         }
-        if(strcmp(cmd, commands[i]) == 0){
-          switch(i){ // case on the index of the slash command.
-            // this is gonna be a big ass switch statement
-            // certain commands are done differently
-            // miuki did a really smart way, with a helper function w
-            // where certain possible things could eb set to null
-            case 0: // /tell > TELL <name> <message>
-            case 1: // /createp > CREATEP <name> <password>
-            case 2: // /creater > CREATER <name>
-            case 3: // /kick > KICK <name>
-            case 4: // /bye > BYE <noargs>
-            case 5: // /leave > LEAVE <noargs>
-            case 6: // /join > JOIN <id>
-            case 7: // /listrooms > LISTR <noargs>
-            case 8: // /listusers > LISTU <noargs>
-            case 9: // /joinp > JOINP <id> <password>
-              //append the the verb to the leftover
-              intermediary = malloc(MAXLEN);
-              snprintf(intermediary, MAXLEN, "%s %s%s", verbs[i], leftover, cr);
-              if(sendall(sock_fd, buffer, &bytes_sent) != 0){
-                unix_error("unable to send all bytes");
+        if(strcmp(verbs[i], cmd) == 0){
+          switch(i){ // switch on the index
+            //WAIT! it could be an acknoweldgement --- ughhh
+            // so i guess i have to include all possible acks in the array that contains all verbs
+            // only cases i have to support are
+            // 11 ahola, 15 hi, and motd, so default, print everything
+            case 11: // !AHOLA
+              // ask user for username
+              // this is where i send the username, which should be a command line argument
+              //printf("please enter your username: ");
+              snprintf(buffer, MAXLEN, "%s %s%s", verbs[12], username, cr);
+              if(sendall(sock_fd, buffer, &bytes_sent)){
+                unix_error("couldn't send username");
               }
               execution_done = 1;
+              // and then the user will enter user information
               break;
-            case 10: // /help <doesnt go to server>
-              print_help();
+            case 15: //HI <username>
+              printf("%s", buffer);
               execution_done = 1;
               break;
-            default: // how the fuck
-              unix_error("hit default on switch statment");
-            // should't neeed to break at default
-          } // end of switch
-        } // end of if statement
-        if(execution_done==1){
-          // execution is done
-          break; // break the for loop
+            case 16: //ECHO <message>
+              printf("%s", leftover);
+              execution_done = 1;
+              break;
+            default: // literally everything else, at least for now
+              printf("%s", buffer);
+              execution_done = 1;
+              break;
+          }
+        }
+        if(execution_done == 1){
+          break;
         }
       } // end of for loop
-    } // end of else statement, for else it's a slash command
-  } // end of if isset, which is the selection
-  // so this is the end of teh case where we recieve input from the user //
-  if(FD_ISSET(sock_fd, &readfds)){ // the server is sending us information
-    //is the server sends us information its either an acknoweldgement
-    // a message to be echoed , or some sort of commmand, or some sort of error
-    recv_all(sock_fd, buffer); // receive all from the server
-    //after recieving all, parse out the command, because it has to be some sort of command
-    // these are the variables you have: buffer(the string from serv),
-    // int bytes sent int bytes recv int execution done, char* intermediary
-    leftover = leftover;
-    cmd = strdup(buffer);
-    leftover = strtok(cmd, " ");
-    printf("%s", buffer);
-    /*for(i=0;i<sizeof(verbs);i++){ // iterate through the list of verbs
-      //okay
-      if(verbs[i] == NULL){
-        printf("not a supported command");
-        break;
-      }
-      if(strcmp(verbs[i], cmd) == 0){
-        //switch(i){ // switch on the index
-          //WAIT! it could be an acknoweldgement --- ughhh
-          // so i guess i have to include all possible acks in the array that contains all verbs
-
-        //}
-      }
-    } // end of for loop */
-
-
-
-
-  } // end of if im getting things from the server
-
+    } // end of if im getting things from the server
+  } // end of major while loop
   return 0;
-}
+} // end of main
 
 char* reversestr(const char* src){ //dest is unmalloced
   char* dest;
@@ -260,7 +303,8 @@ int recv_all(int fd, char* buf){
   // the buffer should already be malloced or just be a static array
   // assume buf is currently empty, or ust make it empty here
   memset(buf, 0, MAXLEN); // cleans all of the buffer
-  int result, n = 0; // result is the number of bytes read out
+  int result = 0; // result is the number of bytes read out
+  int n = 0;
   char intermediary[MAXLEN];
   while((n = recv(fd, intermediary, MAXLEN, 0)) >= 0){ // while it hasnt recieved zero OR i could change zero to a -1
     // append the recieved stuff into buf
@@ -275,11 +319,13 @@ int recv_all(int fd, char* buf){
 int sendall(int fd, char* buf, int* len){
   // send all returns 0 if successful
   // returns -1 if not
+  // dont actuallt send en bytes, send strlen bytes and use len as a return
   int total = 0;
-  int bytesleft = *len;
+  int tosend = strlen(buf);
+  int bytesleft = strlen(buf);
   int n;
 
-  while(total < *len){
+  while(total < tosend){
       n = send(fd, buf+total, bytesleft, 0);
       if(n == -1)
         break;
@@ -297,13 +343,27 @@ int sendall(int fd, char* buf, int* len){
 /* this will handle aloha
 *
 */
+int sendAloha(int fd){
+  char buffer[MAXLEN];
+  memset(buffer, 0, MAXLEN);
+  int bytes_sent;
+
+  snprintf(buffer, MAXLEN, "%s%s", verbs[10], cr);
+
+  if(sendall(fd, buffer,  &bytes_sent) != 0){
+    unix_error("unable to send ALOHA");
+    return -1;
+  }
+  return 0;
+}
+/*
 int handshake(int fd){
   // will return 0 if successful
   //elseewise -1
   char* ack = 0;
   char recvbuf[MAXLEN];
   char buffer[MAXLEN];
-  //char sendbuf[MAXLEN];
+  char sendbuf[MAXLEN];
   char* temp;
   // in the client the thing is non blocking, so set it to non blocking
   int bytes_sent;
@@ -314,10 +374,10 @@ int handshake(int fd){
   ack = reversestr(verbs[10]);
   ack = combineStrings(ack, cr); // add on carraige returns
   // bytes sent gets changed by sendall
-  //snprintf(sendbuf, MAXLEN, "%s %s", verbs[10], cr);
+  snprintf(sendbuf, MAXLEN, "%s %s", verbs[10], cr);
   //temp = combineStrings(verbs[10], " \0");
   //temp = combineStrings(temp, cr);
-  temp = "ALOHA! \r\n\0";
+  //temp = "ALOHA! \r\n\0";
   bytes_sent = strlen(temp);
   printf("%s", temp);
   if(sendall(fd, temp, &bytes_sent)!= 0){
@@ -368,7 +428,7 @@ int handshake(int fd){
   printf("%s", temp);
   return 0;
 }
-
+*/
 int unblock(int fd){ // makes socket non blocking
   int flags;
   int n;
@@ -419,4 +479,8 @@ void list_commands(){
   printf("/listusers\t\tLISTU <noargs>-- lists the users currently in the chatroom\n");
   printf("/joinp\t\tJOINP <id> <password>-- joins a user to a private chatroom\n");
   printf("/help\t\t <noverb> <noargs>-- prints this help menu\n");
+}
+
+void clean(char* buffer){ // memset's a buffer in place
+  memset(buffer, 0, strlen(buffer));
 }

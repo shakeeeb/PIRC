@@ -139,17 +139,17 @@ void* login_thread(void *fd) {
   struct client *newclient;
   int bytes, count = 0, n;
   char *token;
-	pthread_t eid;
 
+	pthread_t eid;
   //clear_buf(buffer, MAXMSG);
   // FIRST connect to the server, so there should be an initial "ALOHA!", "!AHOLA", and "IAM <username>"
   if ((bytes = recv_all(pfd, buffer)) != 0) {
     debug(buffer);
-    char *bptr = buffer;
-    while (*bptr != '\0') {
+    //char *bptr = buffer;
+    /*while (*bptr != '\0') {
       printf("%d", *bptr);
       bptr++;
-    } 65 76 79 72 65 33
+    } //65 76 79 72 65 33 */
     if (strcmp(buffer, opencs) == 0) {
       n = strlen(opensc);
       sendall(pfd, opensc, &n);

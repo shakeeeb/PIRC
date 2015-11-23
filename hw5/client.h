@@ -27,14 +27,15 @@
   int open_clientfd(char* hostname, char* port); // uses addrinfo, traverses it, and connects to the server
   int Open_clientfd(char* hostname, char* port); // wrapper around Open_clientfd
   int sendall(int fd, char* buf, int* len); //makes sure a certain number of bytes are sent out
-  int handshake(int fd); //initial aloha as well as identification of the user
+  int sendAloha(int fd); // just sends out the initial aloha
+  //int handshake(int fd); //initial aloha as well as identification of the user
   // TODO in handshake-- recieve the correct kind of errors
   int unblock(int fd); // sets a file descriptor to non blocking
   char* combineStrings(char* prefix, char* suffix); // this combines two strings by mallocing space and returns result
   void print_help(); // prints the help menu, for how the client is called
   int recv_all(int fd, char* buf); // receive all receives everything
 
-  char* cr = "\r\n\0";
+  char* cr = " \r\n\0";
 
    char* commands[] = {
     "/tell\0", // TELL 0
@@ -65,29 +66,30 @@
     "LISTR\0",// 7 RTSIL
     "LISTU\0", //8 UTSIL
     "JOINP\0", // 9 PNIOJ this ends the list of verbs that have commands
-    "ALOHA!\0",// 10 AHOLA! but i took care of that
-    "IAM \0", // 11 none
-    "MSG \0", // 12 none
-    "ERR\0",// 13 ERR
-    "HI\0", // 14 none
-    "ECHO\0", // 15 ECHO
-    "ECHOP\0", // 16 ECHOP
-    "AUTH\0", // 17 AUTH
-    "PASS\0", // 18 PASS
-    "IAMNEW\0", // 19
-    "HINEW\0", // 20
-    "NEWPASS\0", // 21
-    "KBYE\0", //22
-    "LLET\0", //23 tell ACK
-    "PETAERC\0", //24createp ack
-    "RETAERC\0", //25creater ack
-    "KCIK\0", //26kick ack
-    "EVAEL\0", //27leave ack
-    "NIOJ\0", //28 join ack
-    "RTSIL\0", //29 listr ack
-    "UTSIL\0", //30 listu ack
-    "PNIOJ\0", //31 joinp ack
-    NULL //32 double null terminated
+    "ALOHA!\0",// 10
+    "!AHOLA\0", // 11
+    "IAM\0", // 12 none
+    "MSG \0", // 13 none
+    "ERR\0",// 14 ERR
+    "HI\0", // 15 none
+    "ECHO\0", // 16 ECHO
+    "ECHOP\0", // 17 ECHOP
+    "AUTH\0", // 18 AUTH
+    "PASS\0", // 19 PASS
+    "IAMNEW\0", // 20
+    "HINEW\0", // 21
+    "NEWPASS\0", // 22
+    "KBYE\0", //23
+    "LLET\0", //24 tell ACK
+    "PETAERC\0", //25 createp ack
+    "RETAERC\0", //26 creater ack
+    "KCIK\0", //27 kick ack
+    "EVAEL\0", //28 leave ack
+    "NIOJ\0", //29 join ack
+    "RTSIL\0", //30 listr ack
+    "UTSIL\0", //31 listu ack
+    "PNIOJ\0", //32 joinp ack
+    NULL //33 double null terminated
   };
 
 #endif
