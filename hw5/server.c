@@ -45,19 +45,19 @@ int main (int argc, char ** argv) {
   fflush(stdout);
 
   /* Begin listening for clients */
-  struct epoll_event ev, events[10];
-  int listen_fd, *connfd, epollfd, numfd, i;
-  socklen_t clientlen;
-  struct sockaddr_storage clientaddr;
-  pthread_t lid;
-
+  struct epoll_event ev, events[10]; // create inital epollevent
+  int listen_fd, *connfd, epollfd, numfd, i; // several file descriptors
+  socklen_t clientlen; // length of teh cleitn in socklen
+  struct sockaddr_storage clientaddr; // sockadder
+  pthread_t lid = 0; // pthread id
+  lid = lid;
   // listen for clients
   listen_fd = open_listenfd(port);
 
   // create epoll event to initailize the epoll event struct
   epollfd = epoll_create(10);
   ev.events = EPOLLIN; // set events so you can read & write
-  ev.data.fd = listen_fd;
+  ev.data.fd = listen_fd; //
   if (epoll_ctl(epollfd, EPOLL_CTL_ADD, listen_fd, &ev) == -1) {
   	perror("epoll_ctl: listen_sock");
   	exit(EXIT_FAILURE);
@@ -67,7 +67,13 @@ int main (int argc, char ** argv) {
   	numfd = epoll_wait(epollfd, events, 10, -1);
     // keep accepting new clients in a loop
   	for (i = 0; i < numfd; i++) {
-  		if (events[i].data.fd == listen_fd) {
+      if(events[i].events & EPOLLERR || events[i].events & EPOLLHUP){ // if there is some sort of error
+        fprintf(stderr, "epoll error\n");
+        close(events[i].data.fd);
+        continue;
+      } else if (events[i].data.fd == listen_fd) { // if the listen fd has found a connection
+        // the second check is for the listening socket.
+        // the last check is for epollin
   			// create copy of connection file descriptor and accept fd
   			clientlen = sizeof(clientaddr); // TODO: Wrapper functions
   			connfd = malloc(sizeof(int));
@@ -76,12 +82,27 @@ int main (int argc, char ** argv) {
         non_blocking_fd(*connfd);
 
         ev.events = EPOLLIN | EPOLLET; // set ability to read/write to fd
-        ev.data.fd = *connfd;
+        ev.data.fd = *connfd; // adds teh file descripotor to the epollset
         epoll_ctl(epollfd, EPOLL_CTL_ADD, *connfd, &ev);
 
         // create thread to login this fd
         pthread_create(&lid, NULL, login_thread, connfd);
-  		}
+  		} else { // if its not listenfd that has found a connection, what's going on?
+      // there is data on the current, anonymous file descriptor waiting to be read
+      // check if it's an aloha
+      // WAIT RETRY WITH NONBLOCKINGS
+      char* readbuf = malloc(MAXMSG);
+      int cbytes = 0;
+      if((cbytes = recv_all(events[i].data.fd, readbuf) == 0)){
+        printf("i didnt get anything");
+      }
+      printf("%s", readbuf);
+      // if it's aloha, begin login protocol
+      // lock the filedescriptor for the time being,
+      // epoll will intercept the use of the file descriptor. use a mutex
+
+
+      }
   	}
   }
 }
@@ -138,7 +159,7 @@ void* login_thread(void *fd) {
   char /**whitespace = " \n\r\t",*/ *buffer = malloc(MAXMSG);
   struct client *newclient;
   int bytes, count = 0, n;
-  char *token;
+  char *token = NULL;
 
 	pthread_t eid;
   //clear_buf(buffer, MAXMSG);
@@ -146,10 +167,6 @@ void* login_thread(void *fd) {
   if ((bytes = recv_all(pfd, buffer)) != 0) {
     debug(buffer);
     //char *bptr = buffer;
-    /*while (*bptr != '\0') {
-      printf("%d", *bptr);
-      bptr++;
-    } //65 76 79 72 65 33 */
     if (strcmp(buffer, opencs) == 0) {
       n = strlen(opensc);
       sendall(pfd, opensc, &n);
@@ -169,30 +186,36 @@ void* login_thread(void *fd) {
   //clear_buf(buffer, MAXMSG);
   // get the information from the client and start tokenizing on space
   if ((bytes = recv_all(pfd, buffer)) != 0) {
-    token = strtok(buffer, " ");
+    token = strsep(&buffer, " ");
   }
   // while the token isn't null, find username. IAM on count zero and username on count one
+
   while(token != NULL) {
     // add a null character to the end
     token = strcat(token, "\0");
     // check for the "IAM" message, if found continue
-    if ((strcmp(token, opena) == 0) && count == 0) {
-      continue;
-    // if not found, standard error
-    } else {
-      // something went wrong, send the standard error
-      n = strlen(stderror);
-      sendall(pfd, stderror, &n);
-      debug(stderror);
-      break;
-    }
+    if(count == 0){
+      if(strcmp(token, opena) == 0){
+        token = strsep(&buffer, " ");
+        count++;
+        continue;
+        // if not found, standard error
+      } else {
+        // something went wrong, send the standard error
+        n = strlen(stderror);
+        sendall(pfd, stderror, &n);
+        debug(stderror);
+        break;
+      }
+    } // end of if count == 0
+    // don't set things to not blocking
     // if count is one check for the username
     if (count == 1) {
       if (check_username(token) == 0) {
         // create struct for the new client
         newclient = malloc(sizeof(struct client));
         strcpy(newclient->username, token);
-        newclient->fd = pfd;
+        newclient->fd = pfd; // sets the file descriptor for the
 
         // add the new client to the linked list
         if (clienthead == NULL) {
@@ -207,29 +230,32 @@ void* login_thread(void *fd) {
         }
 
         // send greeting to the client
-        char *greeting = "HI ";
-        strcat(greeting, token);
+        char *greeting = malloc(MAXMSG);; // ok so this is segfaulting, so lets make it so it doesn't segfault
+        snprintf(greeting, MAXMSG, "%s %s%s", verbs[15], token, cr); //place shit int greeting
         n = strlen(greeting);
-        sendall(pfd, greeting, &n);
+        sendall(pfd, greeting, &n); // i need to know when to catch this...
         debug(greeting);
-        char *sendmotd = "ECHO server ";
-        strcat(sendmotd, motd);
+        char* sendmotd = malloc(MAXMSG);
+        snprintf(sendmotd, MAXMSG, "%s %s%s", initecho, motd, cr);
         n = strlen(sendmotd);
-        sendall(pfd, sendmotd, &n);
+        sendall(pfd, sendmotd, &n); // i also need to know how to catch this...
         debug(sendmotd);
+        //free(greeting);
+        //free(motd);
       } else {
         // the username is taken, reject connection with the client
-        char *reject = "ERR 00 SORRY ";
-        strcat(reject, token);
-        strcat(reject, " \r\n");
+        char* reject = malloc(MAXMSG);
+        snprintf(reject, MAXMSG,"%s %s%s", sorryerror, token, cr);
         n = strlen(reject);
         sendall(pfd, reject, &n);
         debug(reject);
         n = strlen(bye);
+        memset(reject, 0, MAXMSG); // clean reject
+        snprintf(reject, MAXMSG, "%s %s", bye, cr);
         sendall(pfd, bye, &n);
         debug(bye);
       }
-    } else {
+    } else { // count isn't equal to 1
       // something went wrong, send the standard error
       n = strlen(stderror);
       sendall(pfd, stderror, &n);
@@ -239,8 +265,8 @@ void* login_thread(void *fd) {
     // increment count
     count++;
     // get the next token
-    token = strtok(NULL, " ");
-  }
+    token = strsep(&buffer, " ");
+  } // endof while token = null
   //  IF the username is NOT in use then create a new port to communicate on & create client link
   //    Also check to make sure username is within the visible ascii spectrum --> NO WHITESPACE
   //  ELSE the username is in use then reject the connection with "ERR 00 SORRY <username>"
@@ -308,10 +334,11 @@ int sendall(int fd, char* buf, int* len) {
   // send all returns 0 if successful
   // returns -1 if not
   int total = 0;
+  int tosend = strlen(buf);
   int bytesleft = *len;
   int n;
 
-  while(total < *len) {
+  while(total < tosend) {
       n = send(fd, buf+total, bytesleft, 0);
       if(n == -1)
         break;
@@ -349,4 +376,28 @@ void help_menu() { // prints the help menu, go figure :P
           "-h\t\tDisplay the help menu & returns EXIT_SUCCESS\n"
           "PORT_NUMBER\tPort number to listen on.\n"
           "MOTD\t\tMessage to display on the client when they connect.\n");
+}
+
+char* getUsername(char* buffer){ // just grabs the username, if it's sequenced properly
+  char* username;
+  char* endl;
+  char* iam = strsep(&buffer, " ");
+  if(strcmp(verbs[12], iam) == 0){
+    username = strsep(&buffer, " ");
+    endl = strsep(&buffer, " ");
+    if(strcmp(cr_nospace, endl) == 0){
+      return username;
+    }
+  } else { return NULL; }
+  return NULL;
+}
+
+char* combineStrings(char* prefix, char* suffix){
+  // this mallocs sace as well as putting two strings together
+  //strcat adds a null, so remeber that
+  char* result;
+  result = malloc(strlen(prefix) + strlen(suffix) + 1);
+  strcpy(result, prefix); // copy prefix over to result
+  strcat(result, suffix); // append on the suffix
+  return result;
 }

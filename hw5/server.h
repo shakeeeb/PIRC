@@ -13,6 +13,7 @@
 	#include <netdb.h>
 	#include <errno.h>
 	#include <fcntl.h>
+	#include "shared.h"
 
 	#ifdef DEBUG // use this statement for print debugging statements
 		#define debug(fmt, ...) printf("\nDEBUG: %s\n\tFunction: %s\n\tLine #: %d\n\n", fmt, __FUNCTION__, __LINE__, ##__VA_ARGS__)
@@ -36,6 +37,8 @@
 	int port = 0, eflag = 0, hflag = 0;
 	// message of the day, open client > server, open server > client, open accept
 	char *motd, *opencs = "ALOHA! \r\n", *opensc = "!AHOLA \r\n", *opena = "IAM", *msg = "MSG", *bye = "BYE \r\n", *echoall = "ECHO";
+	char* initecho = "ECHO server";
+	char* sorryerror = "ERR 00 SORRY";
 	char *stderror = "ERR 100 INTERNAL SERVER ERROR \r\n";
 	struct client *clienthead = NULL;
 

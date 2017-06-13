@@ -10,7 +10,7 @@ int main (int argc, char** argv){
   // elsewise, don't print out the help menu. just do shit.
   char* host;
   char* port;
-  char buffer[MAXLEN];
+  char buffer[MAXMSG];
   char* intermediary;
   int sock_fd = 0;
   int bytes_sent = 0;
@@ -69,7 +69,7 @@ int main (int argc, char** argv){
   int i;
   char* cmd;
   char* leftover;
-  unblock(sock_fd); //honestly, why would be need to not block? doesnt blocking help,
+  //unblock(sock_fd); //honestly, why would be need to not block? doesnt blocking help,
   //becuase it waits for input to finish
   while(running == 0){
     if(select(sock_fd+1, &readfds, NULL, NULL, NULL) == -1){
@@ -81,17 +81,17 @@ int main (int argc, char** argv){
     // IF READING FROM THE USER //
     //                          //
     if(FD_ISSET(STDIN_FILENO, &readfds)){ // the user is sending us information
-      // fgets(buffer, maxlen, stream)
-      memset(buffer, 0, MAXLEN); // zero out the buffer
-      fgets(buffer, MAXLEN, STDIN_FILENO); //get the command from the user
+      // fgets(buffer, MAXMSG, stream)
+      memset(buffer, 0, MAXMSG); // zero out the buffer
+      fgets(buffer, MAXMSG, STDIN_FILENO); //get the command from the user
       //check if it's a slash command, otherwise it's just a regular message
       char c = buffer[0]; //the first character of the buffer needs to be a /
       // IF ITS NOT A SLASH COMMAND
       if(c != '/'){ // its a message
         // append msg and send message msg is 12
-        intermediary = malloc(MAXLEN+24);
+        intermediary = malloc(MAXMSG+24);
           execution_done = 1;
-          snprintf(intermediary, MAXLEN, "%s %s", verbs[12], buffer); // everything is written into int
+          snprintf(intermediary, MAXMSG, "%s %s", verbs[12], buffer); // everything is written into int
           if(sendall(sock_fd, intermediary, &bytes_sent) != 0){ // its supposed to be zero
             unix_error("couldnt send the message");
           }
@@ -125,8 +125,8 @@ int main (int argc, char** argv){
               case 8: // /listusers > LISTU <noargs>
               case 9: // /joinp > JOINP <id> <password>
                 //append the the verb to the leftover
-                intermediary = malloc(MAXLEN);
-                snprintf(intermediary, MAXLEN, "%s %s%s", verbs[i], leftover, cr);
+                intermediary = malloc(MAXMSG);
+                snprintf(intermediary, MAXMSG, "%s %s%s", verbs[i], leftover, cr);
                 if(sendall(sock_fd, buffer, &bytes_sent) != 0){
                   unix_error("unable to send all bytes");
                 }
@@ -182,7 +182,7 @@ int main (int argc, char** argv){
               // ask user for username
               // this is where i send the username, which should be a command line argument
               //printf("please enter your username: ");
-              snprintf(buffer, MAXLEN, "%s %s%s", verbs[12], username, cr);
+              snprintf(buffer, MAXMSG, "%s %s%s", verbs[12], username, cr);
               if(sendall(sock_fd, buffer, &bytes_sent)){
                 unix_error("couldn't send username");
               }
@@ -264,6 +264,9 @@ int open_clientfd(char* hostname, char* port){ // this function opens a client f
   hints.ai_socktype = SOCK_STREAM; // open a connection
   hints.ai_flags = AI_NUMERICSERV; // use a numeric port arg
   hints.ai_flags |= AI_ADDRCONFIG; // recommended for connections
+  // use htons 
+  // use inetaddr to get the ipddr
+  // then just connect
   getaddrinfo(hostname, port, &hints, &listp);
 
   //traverse the list to get one that we can successfully connect to
@@ -302,15 +305,15 @@ int Open_clientfd(char* hostname, char* port){
 int recv_all(int fd, char* buf){
   // the buffer should already be malloced or just be a static array
   // assume buf is currently empty, or ust make it empty here
-  memset(buf, 0, MAXLEN); // cleans all of the buffer
+  memset(buf, 0, MAXMSG); // cleans all of the buffer
   int result = 0; // result is the number of bytes read out
   int n = 0;
-  char intermediary[MAXLEN];
-  while((n = recv(fd, intermediary, MAXLEN, 0)) >= 0){ // while it hasnt recieved zero OR i could change zero to a -1
+  char intermediary[MAXMSG];
+  while((n = recv(fd, intermediary, MAXMSG, 0)) >= 0){ // while it hasnt recieved zero OR i could change zero to a -1
     // append the recieved stuff into buf
     result += n;
     buf = strcat(buf, intermediary); //so everything slowly adds on into the buffer
-    memset(intermediary, 0, MAXLEN); //
+    memset(intermediary, 0, MAXMSG); //
   }
   // this mutates buffer in place
   return result;
@@ -344,11 +347,11 @@ int sendall(int fd, char* buf, int* len){
 *
 */
 int sendAloha(int fd){
-  char buffer[MAXLEN];
-  memset(buffer, 0, MAXLEN);
+  char buffer[MAXMSG];
+  memset(buffer, 0, MAXMSG);
   int bytes_sent;
 
-  snprintf(buffer, MAXLEN, "%s%s", verbs[10], cr);
+  snprintf(buffer, MAXMSG, "%s%s", verbs[10], cr);
 
   if(sendall(fd, buffer,  &bytes_sent) != 0){
     unix_error("unable to send ALOHA");
@@ -361,9 +364,9 @@ int handshake(int fd){
   // will return 0 if successful
   //elseewise -1
   char* ack = 0;
-  char recvbuf[MAXLEN];
-  char buffer[MAXLEN];
-  char sendbuf[MAXLEN];
+  char recvbuf[MAXMSG];
+  char buffer[MAXMSG];
+  char sendbuf[MAXMSG];
   char* temp;
   // in the client the thing is non blocking, so set it to non blocking
   int bytes_sent;
@@ -374,7 +377,7 @@ int handshake(int fd){
   ack = reversestr(verbs[10]);
   ack = combineStrings(ack, cr); // add on carraige returns
   // bytes sent gets changed by sendall
-  snprintf(sendbuf, MAXLEN, "%s %s", verbs[10], cr);
+  snprintf(sendbuf, MAXMSG, "%s %s", verbs[10], cr);
   //temp = combineStrings(verbs[10], " \0");
   //temp = combineStrings(temp, cr);
   //temp = "ALOHA! \r\n\0";
@@ -404,11 +407,11 @@ int handshake(int fd){
   // then get the Username from the user and send it over to the server
   printf("please enter your username:\n");
   //char *fgets(char *restrict s, int n, FILE *restrict stream);
-  fgets(buffer, MAXLEN, STDIN_FILENO); // read the shit from stdin
+  fgets(buffer, MAXMSG, STDIN_FILENO); // read the shit from stdin
   // buffer now has the username, send message IAM <username>
-  temp = malloc(MAXLEN);// extra 3 just in case
+  temp = malloc(MAXMSG);// extra 3 just in case
   //snprintf(writestring, size, formatstring, varargs)
-  snprintf(temp, MAXLEN, "%s %s%s", verbs[11], buffer, cr); // snprintf concats using printf
+  snprintf(temp, MAXMSG, "%s %s%s", verbs[11], buffer, cr); // snprintf concats using printf
   if(sendall(fd, buffer, &bytes_sent) != 0){
     unix_error("couldn't send");
     return -1;
